@@ -1,6 +1,8 @@
 use std::fmt;
 use std::fmt::Formatter;
 
+pub mod error;
+
 pub struct PantsuTag {
     pub tag_name: String,
     pub tag_type: PantsuTagType

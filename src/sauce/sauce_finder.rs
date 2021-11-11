@@ -1,13 +1,14 @@
 use std::path::Path;
 use reqwest::blocking::Client;
 use reqwest::blocking::multipart;
+use crate::common::error::Error;
 
-const IQDB_ADDRESS: &str = "http://gelbooru.iqdb.org/";
+const IQDB_ADDRESS: &str = "https://gelbooru.iqdb.org/";
 
-pub fn find_sauce(image_path: &Path) -> Result<String, reqwest::Error> {
+pub fn find_sauce(image_path: &Path) -> Result<String, Error> {
     let client = Client::new();
     let form = multipart::Form::new()
-        .file("file", image_path).unwrap();
+        .file("file", image_path)?;
     let response = client.post(IQDB_ADDRESS)
         .multipart(form)
         .send()?;
