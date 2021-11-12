@@ -22,9 +22,10 @@ mod tests {
             Ok(file) => file,
         };
         */
-        let res = sauce::sauce_finder::find_sauce(&path);
+        sauce::sauce_finder::find_sauce(&path).unwrap();
+        /*let res = sauce::sauce_finder::find_sauce(&path);
         if let Err(err) = res {
             println!("error:\n{}", err.to_string());
-        }
+        }*/
     }
 }
