@@ -49,7 +49,11 @@ mod tests {
             ]);
         match op {
             Ok(_) => { println!("SUCC") }
-            Err(e) => { println!("ERR: {}", e);}
+            Err(e) => { println!("ERR: {}", e.to_string());}
         }
+        /*let files = pdb.get_files().unwrap();
+        for file in files {
+            println!("file: {}", file);
+        }*/
     }
 }

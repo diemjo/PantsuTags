@@ -8,4 +8,14 @@ pub enum Error {
 
     #[error("Unable to retrieve image source, bad response: {0}")]
     BadResponse(String),
+
+    // pantsu tag database errors
+    #[error("Failed to add tag '{2}' for file '{1}': {0}")]
+    FailedTagInsertion (#[source] rusqlite::Error, String /* file */, String /* tag */),
+
+    #[error("Failed to remove tag '{2}' from file '{1}': {0}")]
+    FailedTagRemoval (#[source] rusqlite::Error, String /* file */, String /* tag */),
+
+    #[error("Failed underlying SQL call: {0}")]
+    SQLError(#[from] rusqlite::Error)
 }
