@@ -16,15 +16,19 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
+    //#[ignore]
     fn find_sauce() {
-        let path = Path::new("test.jpg");
+        let path = Path::new("test.png");
         /*let file = match File::open(&path) {
             Err(why) => panic!("couldn't open {}: {}", path.display(), why),
             Ok(file) => file,
         };
         */
-        sauce::sauce_finder::find_sauce(&path).unwrap();
+        let sauces = sauce::sauce_finder::find_sauce(&path).unwrap();
+        println!("found sauces:");
+        for s in sauces {
+            println!("link: {}, similarity: {}", s.link, s.similarity);
+        }
         /*let res = sauce::sauce_finder::find_sauce(&path);
         if let Err(err) = res {
             println!("error:\n{}", err.to_string());

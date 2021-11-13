@@ -7,5 +7,5 @@ pub enum Error {
     FailedRequest(#[from] reqwest::Error),
 
     #[error("Unable to retrieve image source, bad response: {0}")]
-    BadResponse(String)
+    BadResponse(String),
 }

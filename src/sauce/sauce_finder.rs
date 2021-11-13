@@ -1,12 +1,13 @@
 use std::path::Path;
 use reqwest::blocking::{Client, Response, multipart};
 use select::document::Document;
-use select::predicate::Attr;
+use select::predicate::{Attr, Name};
 use crate::common::error::Error;
+use super::SauceMatch;
 
 const IQDB_ADDRESS: &str = "https://gelbooru.iqdb.org/";
 
-pub fn find_sauce(image_path: &Path) -> Result<String, Error> {
+pub fn find_sauce(image_path: &Path) -> Result<Vec<SauceMatch>, Error> {
     let client = Client::new();
     let form = multipart::Form::new()
         .file("file", image_path).or_else(
@@ -22,30 +23,78 @@ pub fn find_sauce(image_path: &Path) -> Result<String, Error> {
     }
 
     let response = response.text()?;
-    //println!("--- got response ---\n{}", response);
     let html = Document::from(response.as_str());
-    check_response( &html)?;
-
-    println!("success uwu!");
-    Ok(String::from("hello"))
+    extract_sauce( &html)
 }
 
-fn check_response(response_html: &Document) -> Result<(), Error> {
-    let mut status = response_html.find(Attr("id", "urlstat"));
-    if let Some(status) = status.next() {
-        if !status.text().trim().starts_with("OK, ") {
-            return Err(Error::BadResponse(status.text()));
+fn extract_sauce(html: &Document) -> Result<Vec<SauceMatch>, Error> {
+    let mut res: Vec<SauceMatch> = Vec::new();
+    let mut pages = html.find(Attr("id", "pages"));
+    let pages = match pages.next() {
+        Some(pages) => pages,
+        None => return Ok(res),
+    };
+
+    for (idx, img_match) in pages.children().enumerate() {
+        if idx == 0 {
+            continue; // skip uploaded image
         }
-    }
-    else {
-        let mut err = response_html.find(Attr("class", "err"));
-        if let Some(err) = err.next() {
-            return Err(Error::BadResponse(err.text()));
+
+        let mut sauce_link: Option<String> = None;
+        let mut sauce_similarity: Option<f32> = None;
+        for (idx, node) in img_match.find(Name("tr")).enumerate() {
+            match idx {
+                0 | 2 => continue,
+                1 => {
+                    let td_or_th = node.first_child();
+                    if td_or_th.is_none() {
+                        continue;
+                    }
+                    let td_or_th = td_or_th.unwrap();
+
+                    if td_or_th.is(Name("th")) {
+                        break;
+                    }
+
+                    let link = td_or_th.first_child();
+                    if link.is_none() {
+                        break;
+                    }
+                    let href = link.unwrap().attr("href");
+                    if href.is_none() {
+                        break;
+                    }
+                    let href = href.unwrap();
+                    sauce_link = if href.starts_with("//") {
+                        Some("https:".to_string() + href)
+                    } else {
+                        Some(href.to_string())
+                    };
+                },
+                3 => {
+                    let td = node.first_child();
+                    if td.is_none() {
+                        continue;
+                    }
+                    let td = td.unwrap();
+                    let text = td.text();
+                    let similarity = text.split('%').collect::<Vec<&str>>()[0];
+                    sauce_similarity = match similarity.parse::<f32>() {
+                        Ok(similarity) => Ok(Some(similarity)),
+                        Err(e) => Err(Error::BadResponse(String::from("Conversion to float failed"))),
+                    }?;
+                }
+                _ => break,
+            }
         }
-        else {
-            return Err(Error::BadResponse(String::from("Unexpected response")));
+        if let (Some(link), Some(similarity)) = (sauce_link, sauce_similarity) {
+            let sauce_match = SauceMatch {
+                link,
+                similarity,
+            };
+            res.push(sauce_match);
         }
     }
 
-    Ok(())
+    Ok(res)
 }
