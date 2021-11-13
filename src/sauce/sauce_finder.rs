@@ -9,7 +9,11 @@ const IQDB_ADDRESS: &str = "https://gelbooru.iqdb.org/";
 pub fn find_sauce(image_path: &Path) -> Result<String, Error> {
     let client = Client::new();
     let form = multipart::Form::new()
-        .file("file", image_path)?;
+        .file("file", image_path).or_else(
+        |err| {
+            let path = String::from(image_path.to_str().unwrap_or_default());
+            Err(Error::ImageNotFound(err, path))
+        })?;
     let response = client.post(IQDB_ADDRESS)
         .multipart(form)
         .send()?;
