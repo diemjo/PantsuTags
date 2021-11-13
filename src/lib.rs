@@ -1,12 +1,14 @@
-mod sauce;
-mod common;
-
+pub mod sauce;
+pub mod common;
+pub mod db;
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::fs::File;
     use std::path::Path;
+    use crate::common::{PantsuTag, PantsuTagType};
+    use crate::db::PantsuDB;
 
     #[test]
     fn it_works() {
@@ -27,5 +29,23 @@ mod tests {
         if let Err(err) = res {
             println!("error:\n{}", err.to_string());
         }*/
+    }
+
+    #[test]
+    fn add_tags_to_file() {
+        let mut pdb = PantsuDB::new("pantsu_tags.db").unwrap();
+        let op = pdb.add_tags(
+            &String::from("file001.png"),
+            &vec![
+                PantsuTag{ tag_name: String::from("Haha"), tag_type: PantsuTagType::Generic },
+                PantsuTag{ tag_name: String::from("Hehe"), tag_type: PantsuTagType::Artist },
+                PantsuTag{ tag_name: String::from("Hihi"), tag_type: PantsuTagType::Character },
+                PantsuTag{ tag_name: String::from("Hoho"), tag_type: PantsuTagType::Source },
+                PantsuTag{ tag_name: String::from("Huhu"), tag_type: PantsuTagType::Generic },
+            ]);
+        match op {
+            Ok(_) => { println!("SUCC") }
+            Err(e) => { println!("ERR: {}", e);}
+        }
     }
 }
