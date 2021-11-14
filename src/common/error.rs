@@ -17,5 +17,12 @@ pub enum Error {
     TagRemovalError(#[source] rusqlite::Error, String /* file */, String /* tag */),
 
     #[error("Failed underlying SQLite call: {0}")]
-    SQLError(#[from] rusqlite::Error)
+    SQLError(#[from] rusqlite::Error),
+
+    #[error("Cannot convert invalid tag type {0} to enum variant of PantsuTagType")]
+    InvalidTagType(String),
+
+    // file system
+    #[error("Error accessing file or dir {1}: {0}")]
+    FilesystemError(#[source] std::io::Error, String)
 }

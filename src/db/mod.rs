@@ -1,7 +1,10 @@
 pub use rusqlite::{Connection};
-use rusqlite::{params_from_iter, Transaction};
+use rusqlite::{Params, Statement, Transaction};
 use crate::common::error::Error;
-use crate::common::PantsuTag;
+use crate::common::{PantsuTag, PantsuTagType};
+
+mod sqlite_statements;
+mod db_init;
 
 pub struct PantsuDB {
     conn: Connection
@@ -9,9 +12,7 @@ pub struct PantsuDB {
 
 impl PantsuDB {
     pub fn new(db_path: &str) -> Result<PantsuDB, Error> {
-        let conn = Connection::open(db_path)?;
-        conn.execute("PRAGMA foreign_keys=ON", [])?;
-        PantsuDB::create_tables(&conn)?;
+        let conn = db_init::open(db_path)?;
         Ok(PantsuDB { conn })
     }
 
@@ -19,7 +20,7 @@ impl PantsuDB {
     pub fn add_file(&mut self, filename: &str) -> Result<(), Error> {
         let transaction = self.conn.transaction()?;
 
-        PantsuDB::add_filename_to_filename_list(&transaction, filename)?;
+        PantsuDB::add_file_to_file_list(&transaction, filename)?;
 
         transaction.commit()?;
         Ok(())
@@ -28,8 +29,8 @@ impl PantsuDB {
     pub fn remove_file(&mut self, filename: &str) -> Result<(), Error> {
         let transaction = self.conn.transaction()?;
 
-        PantsuDB::remove_all_tags_from_filename(&transaction, filename)?;
-        PantsuDB::remove_filename_from_filename_list(&transaction, filename)?;
+        PantsuDB::remove_all_tags_from_file(&transaction, filename)?;
+        PantsuDB::remove_file_from_file_list(&transaction, filename)?;
         PantsuDB::remove_unused_tags(&transaction)?;
 
         transaction.commit()?;
@@ -37,20 +38,8 @@ impl PantsuDB {
     }
 
     pub fn get_files(&self) -> Result<Vec<String>, Error> {
-        let mut stmt = self.conn.prepare("SELECT filename FROM files")?;
-        let mut rows = stmt.query([]).unwrap();
-
-        let mut files: Vec<String> = Vec::new();
-        while let Some(row) = rows.next()? {
-            files.push(row.get(0)?);
-        }
-        Ok(files)
-
-        /*let rows : Vec<Result<String, rusqlite::Error>>  = stmt.query_map([], |row| {
-            Ok(row.get::<usize, String>(0).unwrap())
-        }).unwrap().collect();
-        let rows : Result<Vec<String>, rusqlite::Error> = rows.into_iter().collect();
-        Ok(rows?)*/
+        let mut stmt = self.conn.prepare(sqlite_statements::SELECT_ALL_FILES)?;
+        query_rows_as_files(&mut stmt, [])
     }
 
     pub fn get_files_with_tags(&self, tags: &Vec<PantsuTag>) -> Result<Vec<String>, Error> {
@@ -58,79 +47,56 @@ impl PantsuDB {
             return self.get_files();
         }
 
-        let mut stmt = self.conn.prepare(
-            &format!("{}{}{}",
-                     "SELECT filename FROM file_tags
-                      WHERE tag IN (", repeat_vars(tags.len()), ")"
-            )
-        )?;
-        let mut rows = stmt.query(
-            params_from_iter(tags.iter().map(|t|&t.tag_name).into_iter())
-        ).unwrap();
+        let formatted_stmt = sqlite_statements::SELECT_FILES_FOR_TAGS
+            .replace(sqlite_statements::SELECT_FILES_FOR_TAGS_PLACEHOLDER, &repeat_vars(tags.len()));
+        let mut stmt = self.conn.prepare(&formatted_stmt)?;
 
-        let mut files: Vec<String> = Vec::new();
-        while let Some(row) = rows.next()? {
-            files.push(row.get(0)?);
-        }
-        Ok(files)
+        let params = rusqlite::params_from_iter(tags.iter().map(|t|&t.tag_name).into_iter());
+        query_rows_as_files(&mut stmt, params)
     }
 
     // file->tag
     pub fn add_tags(&mut self, filename: &str, tags: &Vec<PantsuTag>) -> Result<(), Error> {
         let transaction = self.conn.transaction()?;
 
-        PantsuDB::add_filename_to_filename_list(&transaction, filename)?;
+        PantsuDB::add_file_to_file_list(&transaction, filename)?;
         PantsuDB::add_tags_to_tag_list(&transaction, tags)?;
-        PantsuDB::add_tags_to_filename(&transaction, filename, tags)?;
+        PantsuDB::add_tags_to_file(&transaction, filename, tags)?;
 
         transaction.commit()?;
         Ok(())
     }
 
-    // file->tag
     pub fn remove_tags(&mut self, filename: &str, tags: &Vec<PantsuTag>) -> Result<(), Error> {
         let transaction = self.conn.transaction()?;
 
-        PantsuDB::remove_tags_from_filename(&transaction, filename, tags)?;
+        PantsuDB::remove_tags_from_file(&transaction, filename, tags)?;
         PantsuDB::remove_unused_tags(&transaction)?;
 
         transaction.commit()?;
         Ok(())
     }
+
+    // tags
+    pub fn get_all_tags(&self) -> Result<Vec<PantsuTag>, Error> {
+        let mut stmt = self.conn.prepare(sqlite_statements::SELECT_ALL_TAGS)?;
+        query_rows_as_tags(&mut stmt, [])
+    }
+
+    pub fn get_tags_with_types(&self, types: &Vec<PantsuTagType>) -> Result<Vec<PantsuTag>, Error> {
+        let formatted_stmt = sqlite_statements::SELECT_TAGS_WITH_TYPE
+            .replace(sqlite_statements::SELECT_TAGS_WITH_TYPE_PLACEHOLDER, &repeat_vars(types.len()));
+        let mut stmt = self.conn.prepare(&formatted_stmt)?;
+
+        let params = rusqlite::params_from_iter(types.iter().map(|t|t.to_string()).into_iter());
+        query_rows_as_tags(&mut stmt, params)
+    }
 }
 
 impl PantsuDB {
-    fn create_tables(conn: &Connection) -> Result<(), Error> {
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS files (
-            filename TEXT PRIMARY KEY
-        )",
-            []
-        )?;
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS tags (
-            tag TEXT PRIMARY KEY,
-            tag_type TEXT NOT NULL
-        )",
-            []
-        )?;
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS file_tags (
-            filename TEXT NOT NULL,
-            tag TEXT NOT NULL,
-            PRIMARY KEY(filename, tag),
-            FOREIGN KEY(filename) REFERENCES files(filename),
-            FOREIGN KEY(tag) REFERENCES tags(tag)
-        )",
-            []
-        )?;
-        Ok(())
-    }
 
     fn add_tags_to_tag_list(transaction: &Transaction, tags: &Vec<PantsuTag>) -> Result<(), Error> {
-        let mut add_tag_list_stmt = transaction.prepare(
-            "INSERT OR IGNORE INTO tags (tag, tag_type) VALUES (?, ?)"
-        )?;
+        let mut add_tag_list_stmt = transaction.prepare(sqlite_statements::INSERT_TAG_INTO_TAG_LIST)?;
         for tag in tags {
             add_tag_list_stmt.execute([&tag.tag_name, &tag.tag_type.to_string()])?;
         }
@@ -138,58 +104,69 @@ impl PantsuDB {
     }
 
     fn remove_unused_tags(transaction: &Transaction) -> Result<(), Error> {
-        transaction.execute(
-            "DELETE FROM tags
-            WHERE tag IN
-                   (SELECT tags.tag FROM tags LEFT JOIN file_tags ON tags.tag=file_tags.tag WHERE file_tags.tag IS NULL)",
-            []
-        )?;
+        transaction.execute(sqlite_statements::DELETE_UNUSED_TAGS, [])?;
         Ok(())
     }
 
-    fn add_filename_to_filename_list(transaction: &Transaction, filename: &str) -> Result<(), Error> {
-        let mut add_file_list_stmt = transaction.prepare(
-            "INSERT OR IGNORE INTO files (filename) VALUES (?)"
-        )?;
+    fn add_file_to_file_list(transaction: &Transaction, filename: &str) -> Result<(), Error> {
+        let mut add_file_list_stmt = transaction.prepare(sqlite_statements::INSERT_FILE_INTO_FILE_LIST)?;
         add_file_list_stmt.execute([filename])?;
         Ok(())
     }
 
-    fn remove_filename_from_filename_list(transaction: &Transaction, filename: &str) -> Result<(), Error> {
-        let mut remove_file_list_stmt = transaction.prepare(
-            "DELETE FROM files WHERE filename=(?)"
-        )?;
+    fn remove_file_from_file_list(transaction: &Transaction, filename: &str) -> Result<(), Error> {
+        let mut remove_file_list_stmt = transaction.prepare(sqlite_statements::DELETE_FILE_FROM_FILE_LIST)?;
         remove_file_list_stmt.execute([filename])?;
         Ok(())
     }
 
-    fn add_tags_to_filename(transaction: &Transaction, filename: &str, tags: &Vec<PantsuTag>) -> Result<(), Error> {
-        let mut add_tag_stmt = transaction.prepare(
-            "INSERT OR IGNORE INTO file_tags (filename, tag) VALUES (?, ?)"
-        )?;
+    fn add_tags_to_file(transaction: &Transaction, filename: &str, tags: &Vec<PantsuTag>) -> Result<(), Error> {
+        let mut add_tag_stmt = transaction.prepare(sqlite_statements::INSERT_TAG_FOR_FILE)?;
         for tag in tags {
             add_tag_stmt.execute([filename, &tag.tag_name])?;
         }
         Ok(())
     }
 
-    fn remove_tags_from_filename(transaciton: &Transaction, filename: &str, tags: &Vec<PantsuTag>) -> Result<(), Error> {
-        let mut remove_tag_stmt = transaciton.prepare(
-            "DELETE FROM file_tags WHERE filename=(?) AND tag=(?)"
-        )?;
+    fn remove_tags_from_file(transaciton: &Transaction, filename: &str, tags: &Vec<PantsuTag>) -> Result<(), Error> {
+        let mut remove_tag_stmt = transaciton.prepare(sqlite_statements::DELETE_TAG_FROM_FILE)?;
         for tag in tags {
             remove_tag_stmt.execute([filename, &tag.tag_name])?;
         }
         Ok(())
     }
 
-    fn remove_all_tags_from_filename(transaciton: &Transaction, filename: &str) -> Result<(), Error> {
-        let mut remove_tag_stmt = transaciton.prepare(
-            "DELETE FROM file_tags WHERE filename=(?)"
-        )?;
+    fn remove_all_tags_from_file(transaciton: &Transaction, filename: &str) -> Result<(), Error> {
+        let mut remove_tag_stmt = transaciton.prepare(sqlite_statements::DELETE_ALL_TAGS_FROM_FILE)?;
         remove_tag_stmt.execute([filename])?;
         Ok(())
     }
+}
+
+fn query_rows_as_files<P: Params>(stmt: &mut Statement, params: P) -> Result<Vec<String>, Error> {
+    let rows : Vec<Result<String, rusqlite::Error>>  = stmt.query_map(params, |row| {
+        Ok(row.get::<usize, String>(0).unwrap())
+    }).unwrap().collect();
+    let rows : Result<Vec<String>, rusqlite::Error> = rows.into_iter().collect();
+    Ok(rows?)
+
+    /*let mut rows = stmt.query([]).unwrap();
+    let mut files: Vec<String> = Vec::new();
+    while let Some(row) = rows.next()? {
+        files.push(row.get(0)?);
+    }
+    Ok(files)*/
+}
+
+fn query_rows_as_tags<P: Params>(stmt: &mut Statement, params: P) -> Result<Vec<PantsuTag>, Error> {
+    let rows : Vec<Result<PantsuTag, rusqlite::Error>>  = stmt.query_map(params, |row| {
+        Ok(PantsuTag {
+            tag_name: row.get(0).unwrap(),
+            tag_type: row.get::<usize, String>(1).unwrap().parse().unwrap()
+        })
+    }).unwrap().collect();
+    let rows : Result<Vec<PantsuTag>, rusqlite::Error> = rows.into_iter().collect();
+    Ok(rows?)
 }
 
 fn repeat_vars(count: usize) -> String {
