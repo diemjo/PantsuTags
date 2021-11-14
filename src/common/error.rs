@@ -11,11 +11,11 @@ pub enum Error {
 
     // pantsu tag database errors
     #[error("Failed to add tag '{2}' for file '{1}': {0}")]
-    FailedTagInsertion (#[source] rusqlite::Error, String /* file */, String /* tag */),
+    TagInsertionError(#[source] rusqlite::Error, String /* file */, String /* tag */),
 
     #[error("Failed to remove tag '{2}' from file '{1}': {0}")]
-    FailedTagRemoval (#[source] rusqlite::Error, String /* file */, String /* tag */),
+    TagRemovalError(#[source] rusqlite::Error, String /* file */, String /* tag */),
 
-    #[error("Failed underlying SQL call: {0}")]
+    #[error("Failed underlying SQLite call: {0}")]
     SQLError(#[from] rusqlite::Error)
 }

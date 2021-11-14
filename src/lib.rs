@@ -39,7 +39,7 @@ mod tests {
     fn add_tags_to_file() {
         let mut pdb = PantsuDB::new("pantsu_tags.db").unwrap();
         let op = pdb.add_tags(
-            &String::from("file001.png"),
+            "file001.png",
             &vec![
                 PantsuTag{ tag_name: String::from("Haha"), tag_type: PantsuTagType::Generic },
                 PantsuTag{ tag_name: String::from("Hehe"), tag_type: PantsuTagType::Artist },
@@ -51,9 +51,25 @@ mod tests {
             Ok(_) => { println!("SUCC") }
             Err(e) => { println!("ERR: {}", e.to_string());}
         }
-        /*let files = pdb.get_files().unwrap();
-        for file in files {
-            println!("file: {}", file);
-        }*/
+    }
+
+    #[test]
+    fn test_add_and_remove_file() {
+        let mut pdb = PantsuDB::new("pantsu_tags.db").unwrap();
+        pdb.remove_file("file001.png").unwrap();
+        let files0 = pdb.get_files().unwrap();
+        pdb.add_tags(
+            "file001.png",
+            &vec![
+                PantsuTag { tag_name: String::from("Haha"), tag_type: PantsuTagType::Generic },
+                PantsuTag { tag_name: String::from("Hehe"), tag_type: PantsuTagType::Artist },
+                PantsuTag { tag_name: String::from("Hihi"), tag_type: PantsuTagType::Character }
+            ]).unwrap();
+        let files1 = pdb.get_files().unwrap();
+        pdb.remove_file("file001.png").unwrap();
+        let files2 = pdb.get_files().unwrap();
+        assert_eq!(files0.len() + 1, files1.len());
+        assert_eq!(files1.len() - 1, files2.len());
+        println!("{:?}\n{:?}\n{:?}", files0, files1, files2);
     }
 }

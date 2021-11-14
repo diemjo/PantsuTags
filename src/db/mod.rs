@@ -10,6 +10,7 @@ pub struct PantsuDB {
 impl PantsuDB {
     pub fn new(db_path: &str) -> Result<PantsuDB, Error> {
         let conn = Connection::open(db_path)?;
+        conn.execute("PRAGMA foreign_keys=ON", [])?;
         PantsuDB::create_tables(&conn)?;
         Ok(PantsuDB { conn })
     }
@@ -100,7 +101,6 @@ impl PantsuDB {
 
 impl PantsuDB {
     fn create_tables(conn: &Connection) -> Result<(), Error> {
-        conn.execute("PRAGMA foreign_keys=ON", [])?;
         conn.execute(
             "CREATE TABLE IF NOT EXISTS files (
             filename TEXT PRIMARY KEY
