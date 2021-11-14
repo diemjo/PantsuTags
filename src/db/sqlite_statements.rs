@@ -67,3 +67,11 @@ pub const DELETE_TAG_FROM_FILE : &str =
 
 pub const DELETE_ALL_TAGS_FROM_FILE : &str =
     "DELETE FROM file_tags WHERE filename=(?)";
+
+// clear tables
+pub const CLEAR_FILE_LIST : &str =
+    "DELETE FROM files";
+pub const CLEAR_FILE_TAGS : &str =
+    "DELETE FROM file_tags";
+pub const CLEAR_TAG_LIST : &str =
+    "DELETE FROM tags";

@@ -19,8 +19,11 @@ pub enum Error {
     #[error("Failed underlying SQLite call: {0}")]
     SQLError(#[from] rusqlite::Error),
 
-    #[error("Cannot convert invalid tag type {0} to enum variant of PantsuTagType")]
+    #[error("Cannot convert invalid tag type '{0}' to enum variant of PantsuTagType")]
     InvalidTagType(String),
+
+    #[error("Cannot convert tag string '{0}' to PantsuTag")]
+    InvalidTagFormat(String),
 
     // file system
     #[error("Error accessing file or dir {1}: {0}")]

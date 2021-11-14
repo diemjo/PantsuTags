@@ -5,12 +5,32 @@ use crate::common::error::Error;
 
 pub mod error;
 
+#[derive(Debug, PartialEq)]
 pub struct PantsuTag {
     pub tag_name: String,
     pub tag_type: PantsuTagType
 }
 
-#[derive(Debug)]
+impl fmt::Display for PantsuTag {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}:{}", self.tag_name, self.tag_type)
+    }
+}
+
+impl FromStr for PantsuTag {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut splitter = s.splitn(2, ':');
+        let first = splitter.next().unwrap();
+        match splitter.next() {
+            Some(second) => Ok(PantsuTag { tag_name: String::from(second), tag_type: String::from(first).parse()? }),
+            None => Err(Error::InvalidTagFormat(String::from(s)))
+        }
+    }
+}
+
+#[derive(Debug, PartialEq)]
 pub enum PantsuTagType {
     Artist,
     Source,

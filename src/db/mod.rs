@@ -16,6 +16,19 @@ impl PantsuDB {
         Ok(PantsuDB { conn })
     }
 
+    // WARNING: ALL DATA WILL BE LOST
+    #[cfg(test)]
+    pub(crate) fn clear(&mut self) -> Result<(), Error> {
+        let transaction = self.conn.transaction()?;
+
+        transaction.execute(sqlite_statements::CLEAR_FILE_TAGS, [])?;
+        transaction.execute(sqlite_statements::CLEAR_TAG_LIST, [])?;
+        transaction.execute(sqlite_statements::CLEAR_FILE_LIST, [])?;
+
+        transaction.commit()?;
+        Ok(())
+    }
+
     // file
     pub fn add_file(&mut self, filename: &str) -> Result<(), Error> {
         let transaction = self.conn.transaction()?;
