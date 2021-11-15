@@ -35,6 +35,7 @@ pub enum PantsuTagType {
     Source,
     Character,
     Generic,
+    Rating,
     Custom
 }
 
@@ -45,6 +46,7 @@ impl fmt::Display for PantsuTagType {
             PantsuTagType::Source => "source",
             PantsuTagType::Character => "character",
             PantsuTagType::Generic => "generic",
+            PantsuTagType::Rating => "rating",
             PantsuTagType::Custom => "custom"
         };
         write!(f, "{}", str)
@@ -60,6 +62,7 @@ impl FromStr for PantsuTagType {
             "source" => Ok(PantsuTagType::Source),
             "character" => Ok(PantsuTagType::Character),
             "generic" => Ok(PantsuTagType::Generic),
+            "rating" => Ok(PantsuTagType::Rating),
             "custom" => Ok(PantsuTagType::Custom),
             other => Err(Error::InvalidTagType(String::from(other)))
         }

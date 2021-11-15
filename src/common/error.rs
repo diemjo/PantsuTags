@@ -15,6 +15,10 @@ pub enum Error {
     #[error("Failed to find tags on image website: {0}")]
     NoTagsFound(String),
 
+    #[error("Error getting tags from html.")]
+    ErrorGettingTags,
+
+
     // pantsu tag database errors
     #[error("Failed to add tag '{2}' for file '{1}': {0}")]
     TagInsertionError(#[source] rusqlite::Error, String /* file */, String /* tag */),
