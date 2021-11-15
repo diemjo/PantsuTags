@@ -1,6 +1,7 @@
 use std::fmt;
 use std::fmt::Formatter;
 use std::str::FromStr;
+use enum_iterator::IntoEnumIterator;
 use crate::common::error::Error;
 
 pub mod error;
@@ -30,7 +31,7 @@ impl FromStr for PantsuTag {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, IntoEnumIterator)]
 pub enum PantsuTagType {
     Artist,
     Source,
