@@ -9,7 +9,7 @@ pub struct SauceMatch {
 #[cfg(test)]
 mod tests {
     use std::path::Path;
-    use crate::common::{PantsuTag, PantsuTagType};
+    use crate::common::pantsu_tag::{PantsuTag, PantsuTagType};
     use crate::sauce::{sauce_finder, tag_finder};
 
     #[test]
