@@ -34,6 +34,6 @@ pub enum Error {
     InvalidTagFormat(String),
 
     // file system
-    #[error("Error accessing file or dir {1}: {0}")]
+    #[error("Error creating dir {1}: {0}")]
     DirectoryCreateError(#[source] std::io::Error, String)
 }
