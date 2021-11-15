@@ -1,8 +1,8 @@
 pub use rusqlite::{Connection};
-use rusqlite::{Params, Statement, Transaction};
 use crate::common::error::Error;
 use crate::common::{PantsuTag, PantsuTagType};
 
+mod db_calls;
 mod sqlite_statements;
 mod db_init;
 
@@ -17,13 +17,12 @@ impl PantsuDB {
     }
 
     // WARNING: ALL DATA WILL BE LOST
-    #[cfg(test)]
-    pub(crate) fn clear(&mut self) -> Result<(), Error> {
+    pub fn clear(&mut self) -> Result<(), Error> {
         let transaction = self.conn.transaction()?;
 
-        transaction.execute(sqlite_statements::CLEAR_FILE_TAGS, [])?;
-        transaction.execute(sqlite_statements::CLEAR_TAG_LIST, [])?;
-        transaction.execute(sqlite_statements::CLEAR_FILE_LIST, [])?;
+        db_calls::clear_all_file_tags(&transaction)?;
+        db_calls::clear_all_files(&transaction)?;
+        db_calls::clear_all_tags(&transaction)?;
 
         transaction.commit()?;
         Ok(())
@@ -33,7 +32,7 @@ impl PantsuDB {
     pub fn add_file(&mut self, filename: &str) -> Result<(), Error> {
         let transaction = self.conn.transaction()?;
 
-        PantsuDB::add_file_to_file_list(&transaction, filename)?;
+        db_calls::add_file_to_file_list(&transaction, filename)?;
 
         transaction.commit()?;
         Ok(())
@@ -42,39 +41,32 @@ impl PantsuDB {
     pub fn remove_file(&mut self, filename: &str) -> Result<(), Error> {
         let transaction = self.conn.transaction()?;
 
-        PantsuDB::remove_all_tags_from_file(&transaction, filename)?;
-        PantsuDB::remove_file_from_file_list(&transaction, filename)?;
-        PantsuDB::remove_unused_tags(&transaction)?;
+        db_calls::remove_all_tags_from_file(&transaction, filename)?;
+        db_calls::remove_file_from_file_list(&transaction, filename)?;
+        db_calls::remove_unused_tags(&transaction)?;
 
         transaction.commit()?;
         Ok(())
     }
 
-    pub fn get_files(&self) -> Result<Vec<String>, Error> {
-        let mut stmt = self.conn.prepare(sqlite_statements::SELECT_ALL_FILES)?;
-        query_rows_as_files(&mut stmt, [])
+    pub fn get_all_files(&self) -> Result<Vec<String>, Error> {
+        db_calls::get_all_files(&self.conn)
     }
 
     pub fn get_files_with_tags(&self, tags: &Vec<PantsuTag>) -> Result<Vec<String>, Error> {
-        if tags.len()==0 {
-            return self.get_files();
+        if tags.len() == 0 {
+            return self.get_all_files();
         }
-
-        let formatted_stmt = sqlite_statements::SELECT_FILES_FOR_TAGS
-            .replace(sqlite_statements::SELECT_FILES_FOR_TAGS_PLACEHOLDER, &repeat_vars(tags.len()));
-        let mut stmt = self.conn.prepare(&formatted_stmt)?;
-
-        let params = rusqlite::params_from_iter(tags.iter().map(|t|&t.tag_name).into_iter());
-        query_rows_as_files(&mut stmt, params)
+        db_calls::get_files_with_tags(&self.conn, tags)
     }
 
     // file->tag
     pub fn add_tags(&mut self, filename: &str, tags: &Vec<PantsuTag>) -> Result<(), Error> {
         let transaction = self.conn.transaction()?;
 
-        PantsuDB::add_file_to_file_list(&transaction, filename)?;
-        PantsuDB::add_tags_to_tag_list(&transaction, tags)?;
-        PantsuDB::add_tags_to_file(&transaction, filename, tags)?;
+        db_calls::add_file_to_file_list(&transaction, filename)?;
+        db_calls::add_tags_to_tag_list(&transaction, tags)?;
+        db_calls::add_tags_to_file(&transaction, filename, tags)?;
 
         transaction.commit()?;
         Ok(())
@@ -83,8 +75,8 @@ impl PantsuDB {
     pub fn remove_tags(&mut self, filename: &str, tags: &Vec<PantsuTag>) -> Result<(), Error> {
         let transaction = self.conn.transaction()?;
 
-        PantsuDB::remove_tags_from_file(&transaction, filename, tags)?;
-        PantsuDB::remove_unused_tags(&transaction)?;
+        db_calls::remove_tags_from_file(&transaction, filename, tags)?;
+        db_calls::remove_unused_tags(&transaction)?;
 
         transaction.commit()?;
         Ok(())
@@ -92,100 +84,128 @@ impl PantsuDB {
 
     // tags
     pub fn get_all_tags(&self) -> Result<Vec<PantsuTag>, Error> {
-        let mut stmt = self.conn.prepare(sqlite_statements::SELECT_ALL_TAGS)?;
-        query_rows_as_tags(&mut stmt, [])
+        db_calls::get_all_tags(&self.conn)
     }
 
     pub fn get_tags_with_types(&self, types: &Vec<PantsuTagType>) -> Result<Vec<PantsuTag>, Error> {
-        let formatted_stmt = sqlite_statements::SELECT_TAGS_WITH_TYPE
-            .replace(sqlite_statements::SELECT_TAGS_WITH_TYPE_PLACEHOLDER, &repeat_vars(types.len()));
-        let mut stmt = self.conn.prepare(&formatted_stmt)?;
-
-        let params = rusqlite::params_from_iter(types.iter().map(|t|t.to_string()).into_iter());
-        query_rows_as_tags(&mut stmt, params)
+        db_calls::get_tags_with_types(&self.conn, types)
     }
 }
 
-impl PantsuDB {
+#[cfg(test)]
+mod tests {
+    use std::path::{Path, PathBuf};
+    use crate::common::{PantsuTag, PantsuTagType};
+    use crate::common::error::Error;
+    use crate::db::PantsuDB;
 
-    fn add_tags_to_tag_list(transaction: &Transaction, tags: &Vec<PantsuTag>) -> Result<(), Error> {
-        let mut add_tag_list_stmt = transaction.prepare(sqlite_statements::INSERT_TAG_INTO_TAG_LIST)?;
-        for tag in tags {
-            add_tag_list_stmt.execute([&tag.tag_name, &tag.tag_type.to_string()])?;
+    #[test]
+    fn db_add_tags_to_file() {
+        let mut pdb = get_pantsu_db(Some(std::env::current_dir().unwrap().as_path())).unwrap();
+        pdb.add_tags(
+            "file001.png",
+            &vec![
+                "generic:Haha".parse().unwrap(),
+                "artist:Hehe".parse().unwrap(),
+                "character:Hihi".parse().unwrap(),
+                "source:Hoho".parse().unwrap(),
+                "generic:Huhu".parse().unwrap()
+            ]).unwrap();
+    }
+
+    #[test]
+    fn db_add_and_remove_file() {
+        let mut pdb = get_pantsu_db(Some(std::env::current_dir().unwrap().as_path())).unwrap();
+        pdb.clear().unwrap();
+        pdb.add_tags(
+            "file001.png",
+            &vec![
+                "generic:Haha".parse().unwrap(),
+                "artist:Hehe".parse().unwrap(),
+                "character:Hihi".parse().unwrap(),
+            ]).unwrap();
+        let files1 = pdb.get_all_files().unwrap();
+        pdb.remove_file("file001.png").unwrap();
+        let files2 = pdb.get_all_files().unwrap();
+        assert_eq!(1, files1.len());
+        assert_eq!(0, files2.len());
+        println!("{:?}\n{:?}", files1, files2);
+    }
+
+    #[test]
+    fn db_get_tags() {
+        let mut pdb = get_pantsu_db(Some(std::env::current_dir().unwrap().as_path())).unwrap();
+        pdb.clear().unwrap();
+        assert_eq!(pdb.get_all_tags().unwrap().len(), 0);
+        let tags_to_add = vec![
+            "generic:Haha".parse().unwrap(),
+            "artist:Hehe".parse().unwrap(),
+            "character:Hihi".parse().unwrap(),
+        ];
+        pdb.add_tags("file001.png", &tags_to_add).unwrap();
+        let all_tags = pdb.get_all_tags().unwrap();
+        assert_eq!(all_tags, tags_to_add);
+    }
+
+    #[test]
+    fn db_get_generic_tags() {
+        let mut pdb = get_pantsu_db(Some(std::env::current_dir().unwrap().as_path())).unwrap();
+        pdb.clear().unwrap();
+        assert_eq!(pdb.get_all_tags().unwrap().len(), 0);
+        let tags_to_add: Vec<PantsuTag> = vec![
+            "generic:Haha".parse().unwrap(),
+            "artist:Hehe".parse().unwrap(),
+            "character:Hihi".parse().unwrap(),
+            "generic:Huhu".parse().unwrap()
+        ];
+        pdb.add_tags("file001.png", &tags_to_add).unwrap();
+        let all_tags = pdb.get_tags_with_types(&vec![PantsuTagType::Generic]).unwrap();
+        assert_eq!(all_tags, vec![
+            "generic:Haha".parse().unwrap(),
+            "generic:Huhu".parse().unwrap()
+        ]);
+    }
+
+    #[test]
+    fn db_get_generic_and_character_tags() {
+        let mut pdb = get_pantsu_db(Some(std::env::current_dir().unwrap().as_path())).unwrap();
+        pdb.clear().unwrap();
+        assert_eq!(pdb.get_all_tags().unwrap().len(), 0);
+        let tags_to_add = vec![
+            "generic:Haha".parse().unwrap(),
+            "artist:Hehe".parse().unwrap(),
+            "character:Hihi".parse().unwrap(),
+            "generic:Hoho".parse().unwrap()
+        ];
+        pdb.add_tags("file001.png", &tags_to_add).unwrap();
+        let all_tags = pdb.get_tags_with_types(&vec![PantsuTagType::Generic, PantsuTagType::Character]).unwrap();
+        assert_eq!(all_tags, vec![
+            "generic:Haha".parse().unwrap(),
+            "character:Hihi".parse().unwrap(),
+            "generic:Hoho".parse().unwrap()
+        ]);
+    }
+
+    fn get_pantsu_db(path: Option<&Path>) -> Result<PantsuDB, Error> {
+        let mut db_path : PathBuf = match path {
+            Some(path) => PathBuf::from(path),
+            None => get_or_create_data_dir().unwrap()
+        };
+        db_path.push("pantsu_tags.db");
+        Ok(PantsuDB::new(db_path.as_path().to_str().unwrap())?)
+    }
+
+    fn get_or_create_data_dir() -> Result<PathBuf, Error> {
+        match directories::ProjectDirs::from("moe", "karpador", "PantsuTags") {
+            Some(project_dir) => {
+                let mut path = PathBuf::new();
+                path.push(project_dir.data_dir());
+                std::fs::create_dir_all(&path).or_else(|e|
+                    Err(Error::DirectoryCreateError(e, path.as_path().to_str().unwrap().to_string()))
+                )?;
+                Ok(path)
+            },
+            None => panic!("No valid home dir found")
         }
-        Ok(())
     }
-
-    fn remove_unused_tags(transaction: &Transaction) -> Result<(), Error> {
-        transaction.execute(sqlite_statements::DELETE_UNUSED_TAGS, [])?;
-        Ok(())
-    }
-
-    fn add_file_to_file_list(transaction: &Transaction, filename: &str) -> Result<(), Error> {
-        let mut add_file_list_stmt = transaction.prepare(sqlite_statements::INSERT_FILE_INTO_FILE_LIST)?;
-        add_file_list_stmt.execute([filename])?;
-        Ok(())
-    }
-
-    fn remove_file_from_file_list(transaction: &Transaction, filename: &str) -> Result<(), Error> {
-        let mut remove_file_list_stmt = transaction.prepare(sqlite_statements::DELETE_FILE_FROM_FILE_LIST)?;
-        remove_file_list_stmt.execute([filename])?;
-        Ok(())
-    }
-
-    fn add_tags_to_file(transaction: &Transaction, filename: &str, tags: &Vec<PantsuTag>) -> Result<(), Error> {
-        let mut add_tag_stmt = transaction.prepare(sqlite_statements::INSERT_TAG_FOR_FILE)?;
-        for tag in tags {
-            add_tag_stmt.execute([filename, &tag.tag_name])?;
-        }
-        Ok(())
-    }
-
-    fn remove_tags_from_file(transaciton: &Transaction, filename: &str, tags: &Vec<PantsuTag>) -> Result<(), Error> {
-        let mut remove_tag_stmt = transaciton.prepare(sqlite_statements::DELETE_TAG_FROM_FILE)?;
-        for tag in tags {
-            remove_tag_stmt.execute([filename, &tag.tag_name])?;
-        }
-        Ok(())
-    }
-
-    fn remove_all_tags_from_file(transaciton: &Transaction, filename: &str) -> Result<(), Error> {
-        let mut remove_tag_stmt = transaciton.prepare(sqlite_statements::DELETE_ALL_TAGS_FROM_FILE)?;
-        remove_tag_stmt.execute([filename])?;
-        Ok(())
-    }
-}
-
-fn query_rows_as_files<P: Params>(stmt: &mut Statement, params: P) -> Result<Vec<String>, Error> {
-    let rows : Vec<Result<String, rusqlite::Error>>  = stmt.query_map(params, |row| {
-        Ok(row.get::<usize, String>(0).unwrap())
-    }).unwrap().collect();
-    let rows : Result<Vec<String>, rusqlite::Error> = rows.into_iter().collect();
-    Ok(rows?)
-
-    /*let mut rows = stmt.query([]).unwrap();
-    let mut files: Vec<String> = Vec::new();
-    while let Some(row) = rows.next()? {
-        files.push(row.get(0)?);
-    }
-    Ok(files)*/
-}
-
-fn query_rows_as_tags<P: Params>(stmt: &mut Statement, params: P) -> Result<Vec<PantsuTag>, Error> {
-    let rows : Vec<Result<PantsuTag, rusqlite::Error>>  = stmt.query_map(params, |row| {
-        Ok(PantsuTag {
-            tag_name: row.get(0).unwrap(),
-            tag_type: row.get::<usize, String>(1).unwrap().parse().unwrap()
-        })
-    }).unwrap().collect();
-    let rows : Result<Vec<PantsuTag>, rusqlite::Error> = rows.into_iter().collect();
-    Ok(rows?)
-}
-
-fn repeat_vars(count: usize) -> String {
-    assert_ne!(count, 0);
-    let mut s = "?,".repeat(count);
-    // Remove trailing comma
-    s.pop();
-    s
 }

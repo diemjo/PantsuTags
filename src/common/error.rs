@@ -35,5 +35,5 @@ pub enum Error {
 
     // file system
     #[error("Error accessing file or dir {1}: {0}")]
-    FilesystemError(#[source] std::io::Error, String)
+    DirectoryCreateError(#[source] std::io::Error, String)
 }

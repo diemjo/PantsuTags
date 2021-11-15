@@ -1,5 +1,5 @@
 use std::path::Path;
-use reqwest::blocking::{Client, Response, multipart};
+use reqwest::blocking::{Client, multipart};
 use select::document::Document;
 use select::predicate::{Attr, Name};
 use crate::common::error::Error;
