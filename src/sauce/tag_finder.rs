@@ -3,7 +3,7 @@ use select::document::Document;
 use select::predicate::Attr;
 use enum_iterator::IntoEnumIterator;
 use crate::common::error::Error;
-use crate::common::{PantsuTag, PantsuTagType};
+use crate::common::pantsu_tag::{PantsuTag, PantsuTagType};
 
 pub fn find_tags_gelbooru(url: &str) -> Result<Vec<PantsuTag>, Error> {
     let response = blocking::get(url)?;

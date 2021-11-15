@@ -1,6 +1,6 @@
 pub use rusqlite::{Connection};
 use crate::common::error::Error;
-use crate::common::{PantsuTag, PantsuTagType};
+use crate::common::pantsu_tag::{PantsuTag, PantsuTagType};
 
 mod db_calls;
 mod sqlite_statements;
@@ -95,7 +95,7 @@ impl PantsuDB {
 #[cfg(test)]
 mod tests {
     use std::path::{Path, PathBuf};
-    use crate::common::{PantsuTag, PantsuTagType};
+    use crate::common::pantsu_tag::{PantsuTag, PantsuTagType};
     use crate::common::error::Error;
     use crate::db::PantsuDB;
 

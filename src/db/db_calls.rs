@@ -1,6 +1,6 @@
 use rusqlite::{Connection, Transaction};
 use crate::common::error::Error;
-use crate::common::{PantsuTag, PantsuTagType};
+use crate::common::pantsu_tag::{PantsuTag, PantsuTagType};
 use crate::db::sqlite_statements;
 
 // INSERT
@@ -100,7 +100,7 @@ pub fn get_tags_with_types(connection: &Connection, types: &Vec<PantsuTagType>) 
 mod query_helpers {
     use rusqlite::{Params, Statement};
     use crate::common::error::Error;
-    use crate::common::PantsuTag;
+    use crate::common::pantsu_tag::PantsuTag;
 
     pub fn query_rows_as_files<P: Params>(stmt: &mut Statement, params: P) -> Result<Vec<String>, Error> {
         let rows: Vec<Result<String, rusqlite::Error>> = stmt.query_map(params, |row| {
