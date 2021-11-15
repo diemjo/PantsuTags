@@ -2,9 +2,7 @@ use reqwest::StatusCode;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[error("Image not found: {1}")]
-    ImageNotFound(#[source] std::io::Error, String),
-
+    // sauce errors
     #[error("Failed to send image source request: {0}")]
     FailedRequest(#[from] reqwest::Error),
 
@@ -34,6 +32,9 @@ pub enum Error {
     InvalidTagFormat(String),
 
     // file system
+    #[error("File not found: {1}")]
+    FileNotFound(#[source] std::io::Error, String),
+
     #[error("Error creating dir {1}: {0}")]
     DirectoryCreateError(#[source] std::io::Error, String)
 }

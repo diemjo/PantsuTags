@@ -11,7 +11,7 @@ pub fn find_sauce(image_path: &Path) -> Result<Vec<SauceMatch>, Error> {
     let client = Client::new();
     let form = multipart::Form::new()
         .file("file", image_path).or_else(
-        |err| Err(Error::ImageNotFound(err, get_path(image_path))))?;
+        |err| Err(Error::FileNotFound(err, get_path(image_path))))?;
     let response = client.post(IQDB_ADDRESS)
         .multipart(form)
         .send()?;
