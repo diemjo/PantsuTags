@@ -8,10 +8,14 @@ use crate::common::{PantsuTag, PantsuTagType};
 pub fn find_tags_gelbooru(url: &str) -> Result<Vec<PantsuTag>, Error> {
     let response = blocking::get(url)?;
     if !response.status().is_success() {
-        return Err(Error::BadResponse(format!("status code {}", String::from(response.status().as_str()))));
+        return Err(Error::BadResponseStatus(response.status()));
     }
     let html = Document::from(response.text()?.as_str());
     let tags = extract_tags(&html);
+
+    if tags.is_empty() {
+        return Err(Error::NoTagsFound(String::from(url)));
+    }
     Ok(tags)
 }
 

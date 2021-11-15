@@ -1,3 +1,5 @@
+use reqwest::StatusCode;
+
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error("Image not found: {1}")]
@@ -6,8 +8,14 @@ pub enum Error {
     #[error("Failed to send image source request: {0}")]
     FailedRequest(#[from] reqwest::Error),
 
-    #[error("Unable to retrieve image source, bad response: {0}")]
-    BadResponse(String),
+    #[error("Received response with bad http status: {0}")]
+    BadResponseStatus(StatusCode),
+
+    #[error("Failed to find sauces for image: {0}")]
+    NoSaucesFound(String),
+
+    #[error("Failed to find tags on image website: {0}")]
+    NoTagsFound(String),
 
     // pantsu tag database errors
     #[error("Failed to add tag '{2}' for file '{1}': {0}")]

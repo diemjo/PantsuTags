@@ -11,28 +11,30 @@ pub fn find_sauce(image_path: &Path) -> Result<Vec<SauceMatch>, Error> {
     let client = Client::new();
     let form = multipart::Form::new()
         .file("file", image_path).or_else(
-        |err| {
-            let path = String::from(image_path.to_str().unwrap_or_default());
-            Err(Error::ImageNotFound(err, path))
-        })?;
+        |err| Err(Error::ImageNotFound(err, get_path(image_path))))?;
     let response = client.post(IQDB_ADDRESS)
         .multipart(form)
         .send()?;
     if !response.status().is_success() {
-        return Err(Error::BadResponse(format!("status code {}", String::from(response.status().as_str()))));
+        return Err(Error::BadResponseStatus(response.status()));
     }
 
     let response = response.text()?;
     let html = Document::from(response.as_str());
-    extract_sauce( &html)
+    let sauces = extract_sauce(&html);
+
+    if sauces.is_empty() {
+        return Err(Error::NoSaucesFound(get_path(image_path)));
+    }
+    Ok(sauces)
 }
 
-fn extract_sauce(html: &Document) -> Result<Vec<SauceMatch>, Error> {
+fn extract_sauce(html: &Document) -> Vec<SauceMatch> {
     let mut res: Vec<SauceMatch> = Vec::new();
     let mut pages = html.find(Attr("id", "pages"));
     let pages = match pages.next() {
         Some(pages) => pages,
-        None => return Ok(res),
+        None => return res,
     };
 
     for (idx, img_match) in pages.children().enumerate() {
@@ -80,9 +82,9 @@ fn extract_sauce(html: &Document) -> Result<Vec<SauceMatch>, Error> {
                     let text = td.text();
                     let similarity = text.split('%').collect::<Vec<&str>>()[0];
                     sauce_similarity = match similarity.parse::<f32>() {
-                        Ok(similarity) => Ok(Some(similarity)),
-                        Err(e) => Err(Error::BadResponse(String::from("Conversion to float failed"))),
-                    }?;
+                        Ok(f) => Some(f),
+                        Err(_) => break,
+                    }
                 }
                 _ => break,
             }
@@ -96,5 +98,9 @@ fn extract_sauce(html: &Document) -> Result<Vec<SauceMatch>, Error> {
         }
     }
 
-    Ok(res)
+    res
+}
+
+fn get_path(path: &Path) -> String {
+    String::from(path.to_str().unwrap_or_default())
 }
