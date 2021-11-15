@@ -24,26 +24,29 @@ fn extract_tags(html: &Document) -> Vec<PantsuTag> {
 }
 
 fn extract_tags_of_type(html: &Document, tag_type: PantsuTagType, result: &mut Vec<PantsuTag>) {
-    let tags = html.find(Attr("class", tag_type.get_gelbooru_attr()));
-    for tag in tags {
-        for node in tag.children() {
-            if node.is(Attr("href", ())) {
-                result.push(PantsuTag {
-                    tag_name: node.text(),
-                    tag_type,
-                });
+    if let Some(gelbooru_attr) = tag_type.get_gelbooru_attr() {
+        let tags = html.find(Attr("class", gelbooru_attr));
+        for tag in tags {
+            for node in tag.children() {
+                if node.is(Attr("href", ())) {
+                    result.push(PantsuTag {
+                        tag_name: node.text(),
+                        tag_type,
+                    });
+                }
             }
         }
     }
 }
 
 impl PantsuTagType {
-    fn get_gelbooru_attr(&self) -> &str {
+    fn get_gelbooru_attr(&self) -> Option<&str> {
         match self {
-            PantsuTagType::Artist => "tag-type-artist",
-            PantsuTagType::Source => "tag-type-copyright",
-            PantsuTagType::Character => "tag-type-character",
-            PantsuTagType::Generic => "tag-type-general",
+            PantsuTagType::Artist => Some("tag-type-artist"),
+            PantsuTagType::Source => Some("tag-type-copyright"),
+            PantsuTagType::Character => Some("tag-type-character"),
+            PantsuTagType::Generic => Some("tag-type-general"),
+            PantsuTagType::Custom => None,
         }
     }
 }
