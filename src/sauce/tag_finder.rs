@@ -26,10 +26,10 @@ fn extract_tags(html: &Document) -> Result<Vec<PantsuTag>, Error> {
         Some(tag_list) => tag_list,
         None => return Ok(tags),
     };
+    extract_rating(&tag_list, &mut tags)?;
     for tag_type in PantsuTagType::into_enum_iter() {
         extract_tags_of_type(&tag_list, tag_type, &mut tags);
     }
-    extract_rating(&tag_list, &mut tags)?;
     Ok(tags)
 }
 

@@ -18,7 +18,6 @@ pub enum Error {
     #[error("Error getting tags from html.")]
     ErrorGettingTags,
 
-
     // pantsu tag database errors
     #[error("Failed to add tag '{2}' for file '{1}': {0}")]
     TagInsertionError(#[source] rusqlite::Error, String /* file */, String /* tag */),
