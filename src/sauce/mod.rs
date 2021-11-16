@@ -4,6 +4,7 @@ pub mod sauce_finder;
 pub struct SauceMatch {
     pub link: String,
     pub similarity: f32,
+    pub resolution: (i32, i32),
 }
 
 #[cfg(test)]
@@ -18,6 +19,7 @@ mod tests {
         let sauces = sauce_finder::find_sauce(&path).unwrap();
         assert_eq!(sauces[0].link, "http://gelbooru.com/index.php?page=post&s=list&md5=4f76b8d52983af1d28b1bf8d830d684e");
         assert_eq!(sauces[0].similarity, 96.0);
+        assert_eq!(sauces[0].resolution, (533, 745));
     }
 
     #[test]

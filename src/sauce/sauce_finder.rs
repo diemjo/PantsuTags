@@ -44,9 +44,10 @@ fn extract_sauce(html: &Document) -> Vec<SauceMatch> {
 
         let mut sauce_link: Option<String> = None;
         let mut sauce_similarity: Option<f32> = None;
+        let mut sauce_resolution: Option<(i32, i32)> = None;
         for (idx, node) in img_match.find(Name("tr")).enumerate() {
             match idx {
-                0 | 2 => continue,
+                0 => continue,
                 1 => {
                     let td_or_th = node.first_child();
                     if td_or_th.is_none() {
@@ -73,6 +74,25 @@ fn extract_sauce(html: &Document) -> Vec<SauceMatch> {
                         Some(href.to_string())
                     };
                 },
+                2 => {
+                    let td = node.first_child();
+                    if td.is_none() {
+                        break;
+                    }
+
+                    let td = td.unwrap();
+                    let text = td.text();
+                    let resolution = text.split_whitespace().next();
+                    if let Some(resolution) = resolution {
+                        let mut resolution = resolution.split('×');
+                        let resolution = (resolution.next(), resolution.next());
+                        if let (Some(resol1), Some(resol2)) = resolution {
+                            if let (Ok(resol1), Ok(resol2)) = (resol1.parse::<i32>(), resol2.parse::<i32>()) {
+                                sauce_resolution = Some((resol1, resol2));
+                            }
+                        }
+                    }
+                },
                 3 => {
                     let td = node.first_child();
                     if td.is_none() {
@@ -89,10 +109,11 @@ fn extract_sauce(html: &Document) -> Vec<SauceMatch> {
                 _ => break,
             }
         }
-        if let (Some(link), Some(similarity)) = (sauce_link, sauce_similarity) {
+        if let (Some(link), Some(similarity), Some(resolution)) = (sauce_link, sauce_similarity, sauce_resolution) {
             let sauce_match = SauceMatch {
                 link,
                 similarity,
+                resolution,
             };
             res.push(sauce_match);
         }
