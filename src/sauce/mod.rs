@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+
 pub mod tag_finder;
 pub mod sauce_finder;
 
@@ -5,6 +7,22 @@ pub struct SauceMatch {
     pub link: String,
     pub similarity: f32,
     pub resolution: (i32, i32),
+}
+
+impl PartialOrd for SauceMatch {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        match self.similarity.partial_cmp(&other.similarity) {
+            Some(Ordering::Equal) => Some(self.resolution.cmp(&other.resolution)),
+            Some(other) => Some(other),
+            None => None,
+        }
+    }
+}
+
+impl PartialEq for SauceMatch {
+    fn eq(&self, other: &Self) -> bool {
+        self.similarity == other.similarity && self.resolution == other.resolution
+    }
 }
 
 #[cfg(test)]
