@@ -1,5 +1,6 @@
 pub use rusqlite::{Connection};
 use crate::common::error::Error;
+use crate::common::image_file::ImageFile;
 use crate::common::pantsu_tag::{PantsuTag, PantsuTagType};
 
 mod db_calls;
@@ -29,31 +30,31 @@ impl PantsuDB {
     }
 
     // file
-    pub fn add_file(&mut self, filename: &str) -> Result<(), Error> {
+    pub fn add_file(&mut self, file: &ImageFile) -> Result<(), Error> {
         let transaction = self.conn.transaction()?;
 
-        db_calls::add_file_to_file_list(&transaction, filename)?;
+        db_calls::add_file_to_file_list(&transaction, file)?;
 
         transaction.commit()?;
         Ok(())
     }
 
-    pub fn remove_file(&mut self, filename: &str) -> Result<(), Error> {
+    pub fn remove_file(&mut self, file: &ImageFile) -> Result<(), Error> {
         let transaction = self.conn.transaction()?;
 
-        db_calls::remove_all_tags_from_file(&transaction, filename)?;
-        db_calls::remove_file_from_file_list(&transaction, filename)?;
+        db_calls::remove_all_tags_from_file(&transaction, file)?;
+        db_calls::remove_file_from_file_list(&transaction, file)?;
         db_calls::remove_unused_tags(&transaction)?;
 
         transaction.commit()?;
         Ok(())
     }
 
-    pub fn get_all_files(&self) -> Result<Vec<String>, Error> {
+    pub fn get_all_files(&self) -> Result<Vec<ImageFile>, Error> {
         db_calls::get_all_files(&self.conn)
     }
 
-    pub fn get_files_with_tags(&self, tags: &Vec<PantsuTag>) -> Result<Vec<String>, Error> {
+    pub fn get_files_with_tags(&self, tags: &Vec<PantsuTag>) -> Result<Vec<ImageFile>, Error> {
         if tags.len() == 0 {
             return self.get_all_files();
         }
@@ -61,21 +62,20 @@ impl PantsuDB {
     }
 
     // file->tag
-    pub fn add_tags(&mut self, filename: &str, tags: &Vec<PantsuTag>) -> Result<(), Error> {
+    pub fn add_tags(&mut self, file: &ImageFile, tags: &Vec<PantsuTag>) -> Result<(), Error> {
         let transaction = self.conn.transaction()?;
 
-        db_calls::add_file_to_file_list(&transaction, filename)?;
         db_calls::add_tags_to_tag_list(&transaction, tags)?;
-        db_calls::add_tags_to_file(&transaction, filename, tags)?;
+        db_calls::add_tags_to_file_tags(&transaction, file, tags)?;
 
         transaction.commit()?;
         Ok(())
     }
 
-    pub fn remove_tags(&mut self, filename: &str, tags: &Vec<PantsuTag>) -> Result<(), Error> {
+    pub fn remove_tags(&mut self, file: &ImageFile, tags: &Vec<PantsuTag>) -> Result<(), Error> {
         let transaction = self.conn.transaction()?;
 
-        db_calls::remove_tags_from_file(&transaction, filename, tags)?;
+        db_calls::remove_tags_from_file(&transaction, file, tags)?;
         db_calls::remove_unused_tags(&transaction)?;
 
         transaction.commit()?;
@@ -97,13 +97,16 @@ mod tests {
     use std::path::{Path, PathBuf};
     use crate::common::pantsu_tag::{PantsuTag, PantsuTagType};
     use crate::common::error::Error;
+    use crate::common::image_file::ImageFile;
     use crate::db::PantsuDB;
 
     #[test]
     fn db_add_tags_to_file() {
         let mut pdb = get_pantsu_db(Some(std::env::current_dir().unwrap().as_path())).unwrap();
+        pdb.clear().unwrap();
+        pdb.add_file(&get_test_image()).unwrap();
         pdb.add_tags(
-            "file001.png",
+            &get_test_image(),
             &vec![
                 "generic:Haha".parse().unwrap(),
                 "artist:Hehe".parse().unwrap(),
@@ -117,15 +120,16 @@ mod tests {
     fn db_add_and_remove_file() {
         let mut pdb = get_pantsu_db(Some(std::env::current_dir().unwrap().as_path())).unwrap();
         pdb.clear().unwrap();
+        pdb.add_file(&get_test_image()).unwrap();
         pdb.add_tags(
-            "file001.png",
+            &get_test_image(),
             &vec![
                 "generic:Haha".parse().unwrap(),
                 "artist:Hehe".parse().unwrap(),
                 "character:Hihi".parse().unwrap(),
             ]).unwrap();
         let files1 = pdb.get_all_files().unwrap();
-        pdb.remove_file("file001.png").unwrap();
+        pdb.remove_file(&get_test_image()).unwrap();
         let files2 = pdb.get_all_files().unwrap();
         assert_eq!(1, files1.len());
         assert_eq!(0, files2.len());
@@ -142,7 +146,8 @@ mod tests {
             "artist:Hehe".parse().unwrap(),
             "character:Hihi".parse().unwrap(),
         ];
-        pdb.add_tags("file001.png", &tags_to_add).unwrap();
+        pdb.add_file(&get_test_image()).unwrap();
+        pdb.add_tags(&get_test_image(), &tags_to_add).unwrap();
         let all_tags = pdb.get_all_tags().unwrap();
         assert_eq!(all_tags, tags_to_add);
     }
@@ -158,7 +163,8 @@ mod tests {
             "character:Hihi".parse().unwrap(),
             "generic:Huhu".parse().unwrap()
         ];
-        pdb.add_tags("file001.png", &tags_to_add).unwrap();
+        pdb.add_file(&get_test_image()).unwrap();
+        pdb.add_tags(&get_test_image(), &tags_to_add).unwrap();
         let all_tags = pdb.get_tags_with_types(&vec![PantsuTagType::Generic]).unwrap();
         assert_eq!(all_tags, vec![
             "generic:Haha".parse().unwrap(),
@@ -177,7 +183,8 @@ mod tests {
             "character:Hihi".parse().unwrap(),
             "generic:Hoho".parse().unwrap()
         ];
-        pdb.add_tags("file001.png", &tags_to_add).unwrap();
+        pdb.add_file(&get_test_image()).unwrap();
+        pdb.add_tags(&get_test_image(), &tags_to_add).unwrap();
         let all_tags = pdb.get_tags_with_types(&vec![PantsuTagType::Generic, PantsuTagType::Character]).unwrap();
         assert_eq!(all_tags, vec![
             "generic:Haha".parse().unwrap(),
@@ -207,5 +214,9 @@ mod tests {
             },
             None => panic!("No valid home dir found")
         }
+    }
+
+    fn get_test_image() -> ImageFile {
+        ImageFile { filename: String::from("file001.png"), file_source: None }
     }
 }

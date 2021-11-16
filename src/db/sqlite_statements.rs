@@ -5,7 +5,8 @@ pub const PRAGMA_FOREIGN_KEY_ENFORCE : &str =
 // create statements
 pub const CREATE_FILES_TABLE : &str =
     "CREATE TABLE IF NOT EXISTS files (
-            filename TEXT PRIMARY KEY
+            filename TEXT PRIMARY KEY,
+            file_source TEXT
     )";
 
 pub const CREATE_TAGS_TABLE : &str =
@@ -25,12 +26,13 @@ pub const CREATE_FILE_TAGS_TABLE : &str =
 
 // select statements
 pub const SELECT_ALL_FILES : &str =
-    "SELECT filename FROM files";
+    "SELECT filename, file_source FROM files";
 
 pub const SELECT_FILES_FOR_TAGS_PLACEHOLDER : &str = "TAG_LIST";
 pub const SELECT_FILES_FOR_TAGS : &str =
-    "SELECT filename FROM file_tags
-     WHERE tag IN (TAG_LIST)";
+    "SELECT files.filename, files.file_source FROM files
+     JOIN file_tags ON files.filename = file_tags.filename
+     WHERE file_tags.tag IN (TAG_LIST)";
 
 pub const SELECT_ALL_TAGS : &str =
     "SELECT tag, tag_type FROM tags";
@@ -45,7 +47,7 @@ pub const INSERT_TAG_INTO_TAG_LIST : &str =
     "INSERT OR IGNORE INTO tags (tag, tag_type) VALUES (?, ?)";
 
 pub const INSERT_FILE_INTO_FILE_LIST : &str =
-    "INSERT OR IGNORE INTO files (filename) VALUES (?)";
+    "INSERT OR IGNORE INTO files (filename, file_source) VALUES (?, ?)";
 
 pub const INSERT_TAG_FOR_FILE : &str =
     "INSERT OR IGNORE INTO file_tags (filename, tag) VALUES (?, ?)";
