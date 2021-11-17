@@ -38,6 +38,11 @@ pub const SELECT_FILES_FOR_TAGS : &str =
      JOIN file_tags ON files.filename = file_tags.filename
      WHERE file_tags.tag IN (TAG_LIST)";
 
+pub const SELECT_TAGS_FOR_FILE : &str =
+    "SELECT tags.tag, tags.tag_type FROM file_tags
+    JOIN tags ON file_tags.tag = tags.tag
+    WHERE file_tags.filename = (?)";
+
 pub const SELECT_ALL_TAGS : &str =
     "SELECT tag, tag_type FROM tags";
 

@@ -103,6 +103,11 @@ pub fn get_files_with_tags(connection: &Connection, tags: &Vec<PantsuTag>) -> Re
     query_helpers::query_rows_as_files(&mut stmt, params)
 }
 
+pub fn get_tags_for_file(connection: &Connection, file: &ImageFile) -> Result<Vec<PantsuTag>, Error> {
+    let mut stmt = connection.prepare(sqlite_statements::SELECT_TAGS_FOR_FILE)?;
+    query_helpers::query_rows_as_tags(&mut stmt, [&file.filename])
+}
+
 pub fn get_all_tags(connection: &Connection) -> Result<Vec<PantsuTag>, Error> {
     let mut stmt = connection.prepare(sqlite_statements::SELECT_ALL_TAGS)?;
     query_helpers::query_rows_as_tags(&mut stmt, [])
@@ -116,6 +121,8 @@ pub fn get_tags_with_types(connection: &Connection, types: &Vec<PantsuTagType>) 
     let params = rusqlite::params_from_iter(types.iter().map(|t| t.to_string()).into_iter());
     query_helpers::query_rows_as_tags(&mut stmt, params)
 }
+
+
 
 mod query_helpers {
     use rusqlite::{Params, Statement};

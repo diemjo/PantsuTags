@@ -95,6 +95,10 @@ impl PantsuDB {
         Ok(())
     }
 
+    pub fn get_tags_for_file(&self, file: &ImageFile) -> Result<Vec<PantsuTag>, Error> {
+        db_calls::get_tags_for_file(&self.conn, file)
+    }
+
     // tags
     pub fn get_all_tags(&self) -> Result<Vec<PantsuTag>, Error> {
         db_calls::get_all_tags(&self.conn)
@@ -168,6 +172,47 @@ mod tests {
         assert_eq!(1, files1.len());
         assert_eq!(0, files2.len());
         println!("{:?}\n{:?}", files1, files2);
+    }
+
+    #[test]
+    fn db_add_and_remove_tags() {
+        let mut pdb = get_pantsu_db(Some(std::env::current_dir().unwrap().as_path())).unwrap();
+        pdb.clear().unwrap();
+        pdb.add_file(&get_test_image()).unwrap();
+        pdb.add_tags(
+            &get_test_image(),
+            &vec![
+                "general:Haha".parse().unwrap(),
+                "artist:Hehe".parse().unwrap(),
+                "character:Hihi".parse().unwrap(),
+            ]).unwrap();
+        pdb.remove_tags(&get_test_image(), &vec!["general:Haha".parse().unwrap()]).unwrap();
+        let tags = pdb.get_tags_for_file(&get_test_image()).unwrap();
+        assert_eq!(&tags, &vec!["artist:Hehe".parse().unwrap(), "character:Hihi".parse().unwrap()]);
+    }
+
+    #[test]
+    fn db_get_tags_for_file() {
+        let mut pdb = get_pantsu_db(Some(std::env::current_dir().unwrap().as_path())).unwrap();
+        pdb.clear().unwrap();
+        pdb.add_file(&get_test_image()).unwrap();
+        pdb.add_file(&get_test_image2()).unwrap();
+        pdb.add_tags(
+            &get_test_image(),
+            &vec![
+                "general:Haha".parse().unwrap(),
+                "artist:Hehe".parse().unwrap(),
+                "character:Hoho".parse().unwrap(),
+            ]).unwrap();
+        pdb.add_tags(
+            &get_test_image2(),
+            &vec![
+                "general:Haha".parse().unwrap(),
+                "artist:Huhu".parse().unwrap(),
+                "character:Höhö".parse().unwrap(),
+            ]).unwrap();
+        let tags = pdb.get_tags_for_file(&get_test_image2()).unwrap();
+        assert_eq!(&tags, &vec!["general:Haha".parse().unwrap(), "artist:Huhu".parse().unwrap(), "character:Höhö".parse().unwrap()]);
     }
 
     #[test]
@@ -252,5 +297,9 @@ mod tests {
 
     fn get_test_image() -> ImageFile {
         ImageFile { filename: String::from("file001.png"), file_source: None }
+    }
+
+    fn get_test_image2() -> ImageFile {
+        ImageFile { filename: String::from("file002.png"), file_source: Some(String::from("http://real.url")) }
     }
 }
