@@ -71,7 +71,7 @@ impl PantsuTagType {
             PantsuTagType::Artist => Some("tag-type-artist"),
             PantsuTagType::Source => Some("tag-type-copyright"),
             PantsuTagType::Character => Some("tag-type-character"),
-            PantsuTagType::Generic => Some("tag-type-general"),
+            PantsuTagType::General => Some("tag-type-general"),
             PantsuTagType::Rating => None,
             PantsuTagType::Custom => None,
         }

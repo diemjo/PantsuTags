@@ -25,6 +25,10 @@ pub const CREATE_FILE_TAGS_TABLE : &str =
     )";
 
 // select statements
+pub const SELECT_FILE : &str =
+    "SELECT filename, file_source FROM files
+    WHERE filename = (?)";
+
 pub const SELECT_ALL_FILES : &str =
     "SELECT filename, file_source FROM files";
 
@@ -47,7 +51,7 @@ pub const INSERT_TAG_INTO_TAG_LIST : &str =
     "INSERT OR IGNORE INTO tags (tag, tag_type) VALUES (?, ?)";
 
 pub const INSERT_FILE_INTO_FILE_LIST : &str =
-    "INSERT OR IGNORE INTO files (filename, file_source) VALUES (?, ?)";
+    "INSERT INTO files (filename, file_source) VALUES (?, ?)";
 
 pub const INSERT_TAG_FOR_FILE : &str =
     "INSERT OR IGNORE INTO file_tags (filename, tag) VALUES (?, ?)";
@@ -69,6 +73,12 @@ pub const DELETE_TAG_FROM_FILE : &str =
 
 pub const DELETE_ALL_TAGS_FROM_FILE : &str =
     "DELETE FROM file_tags WHERE filename=(?)";
+
+// update statements
+pub const UPDATE_FILE : &str =
+    "UPDATE files
+    SET file_source = (?)
+    WHERE filename = (?)";
 
 // clear tables
 pub const CLEAR_FILE_LIST : &str =

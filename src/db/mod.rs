@@ -50,6 +50,19 @@ impl PantsuDB {
         Ok(())
     }
 
+    pub fn update_file_source(&mut self, file: &ImageFile) -> Result<(), Error> {
+        let transaction = self.conn.transaction()?;
+
+        db_calls::update_file_source(&transaction, file)?;
+
+        transaction.commit()?;
+        Ok(())
+    }
+
+    pub fn get_file(&self, filename: &str) -> Result<ImageFile, Error> {
+        db_calls::get_file(&self.conn, filename)
+    }
+
     pub fn get_all_files(&self) -> Result<Vec<ImageFile>, Error> {
         db_calls::get_all_files(&self.conn)
     }
@@ -92,6 +105,9 @@ impl PantsuDB {
     }
 }
 
+
+
+
 #[cfg(test)]
 mod tests {
     use std::path::{Path, PathBuf};
@@ -101,6 +117,24 @@ mod tests {
     use crate::db::PantsuDB;
 
     #[test]
+    fn db_add_file_twice() {
+        let mut pdb = get_pantsu_db(Some(std::env::current_dir().unwrap().as_path())).unwrap();
+        pdb.clear().unwrap();
+        pdb.add_file(&get_test_image()).unwrap();
+        assert!(matches!(pdb.add_file(&get_test_image()).unwrap_err(), Error::SQLPrimaryKeyError{..}));
+    }
+
+    #[test]
+    fn db_update_file_source() {
+        let mut pdb = get_pantsu_db(Some(std::env::current_dir().unwrap().as_path())).unwrap();
+        pdb.clear().unwrap();
+        let img = &get_test_image();
+        pdb.add_file(img).unwrap();
+        pdb.update_file_source(&ImageFile{ filename: img.filename.clone(), file_source: Some(String::from("https://fake.url")) }).unwrap();
+        assert_eq!(pdb.get_file(&img.filename).unwrap().file_source, Some(String::from("https://fake.url")));
+    }
+
+    #[test]
     fn db_add_tags_to_file() {
         let mut pdb = get_pantsu_db(Some(std::env::current_dir().unwrap().as_path())).unwrap();
         pdb.clear().unwrap();
@@ -108,11 +142,11 @@ mod tests {
         pdb.add_tags(
             &get_test_image(),
             &vec![
-                "generic:Haha".parse().unwrap(),
+                "general:Haha".parse().unwrap(),
                 "artist:Hehe".parse().unwrap(),
                 "character:Hihi".parse().unwrap(),
                 "source:Hoho".parse().unwrap(),
-                "generic:Huhu".parse().unwrap()
+                "general:Huhu".parse().unwrap()
             ]).unwrap();
     }
 
@@ -124,7 +158,7 @@ mod tests {
         pdb.add_tags(
             &get_test_image(),
             &vec![
-                "generic:Haha".parse().unwrap(),
+                "general:Haha".parse().unwrap(),
                 "artist:Hehe".parse().unwrap(),
                 "character:Hihi".parse().unwrap(),
             ]).unwrap();
@@ -142,7 +176,7 @@ mod tests {
         pdb.clear().unwrap();
         assert_eq!(pdb.get_all_tags().unwrap().len(), 0);
         let tags_to_add = vec![
-            "generic:Haha".parse().unwrap(),
+            "general:Haha".parse().unwrap(),
             "artist:Hehe".parse().unwrap(),
             "character:Hihi".parse().unwrap(),
         ];
@@ -153,43 +187,43 @@ mod tests {
     }
 
     #[test]
-    fn db_get_generic_tags() {
+    fn db_get_general_tags() {
         let mut pdb = get_pantsu_db(Some(std::env::current_dir().unwrap().as_path())).unwrap();
         pdb.clear().unwrap();
         assert_eq!(pdb.get_all_tags().unwrap().len(), 0);
         let tags_to_add: Vec<PantsuTag> = vec![
-            "generic:Haha".parse().unwrap(),
+            "general:Haha".parse().unwrap(),
             "artist:Hehe".parse().unwrap(),
             "character:Hihi".parse().unwrap(),
-            "generic:Huhu".parse().unwrap()
+            "general:Huhu".parse().unwrap()
         ];
         pdb.add_file(&get_test_image()).unwrap();
         pdb.add_tags(&get_test_image(), &tags_to_add).unwrap();
-        let all_tags = pdb.get_tags_with_types(&vec![PantsuTagType::Generic]).unwrap();
+        let all_tags = pdb.get_tags_with_types(&vec![PantsuTagType::General]).unwrap();
         assert_eq!(all_tags, vec![
-            "generic:Haha".parse().unwrap(),
-            "generic:Huhu".parse().unwrap()
+            "general:Haha".parse().unwrap(),
+            "general:Huhu".parse().unwrap()
         ]);
     }
 
     #[test]
-    fn db_get_generic_and_character_tags() {
+    fn db_get_general_and_character_tags() {
         let mut pdb = get_pantsu_db(Some(std::env::current_dir().unwrap().as_path())).unwrap();
         pdb.clear().unwrap();
         assert_eq!(pdb.get_all_tags().unwrap().len(), 0);
         let tags_to_add = vec![
-            "generic:Haha".parse().unwrap(),
+            "general:Haha".parse().unwrap(),
             "artist:Hehe".parse().unwrap(),
             "character:Hihi".parse().unwrap(),
-            "generic:Hoho".parse().unwrap()
+            "general:Hoho".parse().unwrap()
         ];
         pdb.add_file(&get_test_image()).unwrap();
         pdb.add_tags(&get_test_image(), &tags_to_add).unwrap();
-        let all_tags = pdb.get_tags_with_types(&vec![PantsuTagType::Generic, PantsuTagType::Character]).unwrap();
+        let all_tags = pdb.get_tags_with_types(&vec![PantsuTagType::General, PantsuTagType::Character]).unwrap();
         assert_eq!(all_tags, vec![
-            "generic:Haha".parse().unwrap(),
+            "general:Haha".parse().unwrap(),
             "character:Hihi".parse().unwrap(),
-            "generic:Hoho".parse().unwrap()
+            "general:Hoho".parse().unwrap()
         ]);
     }
 

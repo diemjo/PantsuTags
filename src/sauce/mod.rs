@@ -26,8 +26,8 @@ mod tests {
     fn find_tag() {
         let url = "http://gelbooru.com/index.php?page=post&s=list&md5=4f76b8d52983af1d28b1bf8d830d684e";
         let tags = tag_finder::find_tags_gelbooru(url).unwrap();
-        assert!(tags.iter().any(|tag| tag.tag_name.eq("loli") && matches!(tag.tag_type, PantsuTagType::Generic)));
-        assert!(tags.iter().any(|tag| tag.tag_name.eq("stuffed dinosaur") && matches!(tag.tag_type, PantsuTagType::Generic)));
+        assert!(tags.iter().any(|tag| tag.tag_name.eq("loli") && matches!(tag.tag_type, PantsuTagType::General)));
+        assert!(tags.iter().any(|tag| tag.tag_name.eq("stuffed dinosaur") && matches!(tag.tag_type, PantsuTagType::General)));
         assert!(tags.iter().any(|tag| tag.tag_name.eq("ichihaya") && matches!(tag.tag_type, PantsuTagType::Artist)));
         assert!(tags.iter().any(|tag| tag.tag_name.eq("awano iroha") && matches!(tag.tag_type, PantsuTagType::Character)));
         assert!(tags.iter().any(|tag| tag.tag_name.eq("original") && matches!(tag.tag_type, PantsuTagType::Source)));

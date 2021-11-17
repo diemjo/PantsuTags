@@ -1,5 +1,6 @@
-use rusqlite::{Connection, params, Transaction};
+use rusqlite::{Connection, ffi, params, Transaction};
 use crate::common::error::Error;
+use crate::common::error::Error::{SQLError, SQLPrimaryKeyError};
 use crate::common::image_file::ImageFile;
 use crate::common::pantsu_tag::{PantsuTag, PantsuTagType};
 use crate::db::sqlite_statements;
@@ -15,8 +16,15 @@ pub fn add_tags_to_tag_list(transaction: &Transaction, tags: &Vec<PantsuTag>) ->
 
 pub fn add_file_to_file_list(transaction: &Transaction, file: &ImageFile) -> Result<(), Error> {
     let mut add_file_list_stmt = transaction.prepare(sqlite_statements::INSERT_FILE_INTO_FILE_LIST)?;
-    add_file_list_stmt.execute(params![&file.filename, &file.file_source])?;
-    Ok(())
+    let res = add_file_list_stmt.execute(params![&file.filename, &file.file_source]);
+    // check for primary key constraint
+    return if let Err(rusqlite::Error::SqliteFailure(ffi::Error { code: _, extended_code: 1555 }, ..)) = res {
+        Err(SQLPrimaryKeyError(res.unwrap_err()))
+    } else if let Err(e) = res {
+        Err(SQLError(e))
+    } else {
+        Ok(())
+    }
 }
 
 pub fn add_tags_to_file_tags(transaction: &Transaction, file: &ImageFile, tags: &Vec<PantsuTag>) -> Result<(), Error> {
@@ -24,6 +32,13 @@ pub fn add_tags_to_file_tags(transaction: &Transaction, file: &ImageFile, tags: 
     for tag in tags {
         add_tag_stmt.execute([&file.filename, &tag.tag_name])?;
     }
+    Ok(())
+}
+
+// UPDATE
+pub fn update_file_source(transaction: &Transaction, file: &ImageFile) -> Result<(), Error> {
+    let mut update_file_statement = transaction.prepare(sqlite_statements::UPDATE_FILE)?;
+    update_file_statement.execute(params![&file.file_source, &file.filename])?;
     Ok(())
 }
 
@@ -69,6 +84,10 @@ pub fn clear_all_tags(transaction: &Transaction) -> Result<(), Error> {
 }
 
 // SELECT
+pub fn get_file(connection: &Connection, filename: &str) -> Result<ImageFile, Error> {
+    let mut stmt = connection.prepare(sqlite_statements::SELECT_FILE)?;
+    query_helpers::query_row_as_file(&mut stmt, [filename])
+}
 
 pub fn get_all_files(connection: &Connection) -> Result<Vec<ImageFile>, Error> {
     let mut stmt = connection.prepare(sqlite_statements::SELECT_ALL_FILES)?;
@@ -103,6 +122,18 @@ mod query_helpers {
     use crate::common::error::Error;
     use crate::common::image_file::ImageFile;
     use crate::common::pantsu_tag::PantsuTag;
+
+    pub fn query_row_as_file<P: Params>(stmt: &mut Statement, params: P) -> Result<ImageFile, Error> {
+        let file = stmt.query_row(params, |row| {
+            Ok(
+                ImageFile {
+                    filename: row.get(0).unwrap(),
+                    file_source: row.get(1).ok()
+                }
+            )
+        });
+        Ok(file?)
+    }
 
     pub fn query_rows_as_files<P: Params>(stmt: &mut Statement, params: P) -> Result<Vec<ImageFile>, Error> {
         let rows: Vec<Result<ImageFile, rusqlite::Error>> = stmt.query_map(params, |row| {
