@@ -36,5 +36,8 @@ pub enum Error {
     FileNotFound(#[source] std::io::Error, String),
 
     #[error("Error creating dir {1}: {0}")]
-    DirectoryCreateError(#[source] std::io::Error, String)
+    DirectoryCreateError(#[source] std::io::Error, String),
+
+    #[error("File '{0}' is not an image or cannot be loaded as an image")]
+    ImageLoadError(String)
 }
