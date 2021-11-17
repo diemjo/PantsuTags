@@ -1,4 +1,4 @@
-pub use rusqlite::{Connection};
+use rusqlite::{Connection};
 use crate::common::error::Error;
 use crate::common::image_file::ImageFile;
 use crate::common::pantsu_tag::{PantsuTag, PantsuTagType};
@@ -120,7 +120,10 @@ mod tests {
     use crate::common::image_file::ImageFile;
     use crate::db::PantsuDB;
 
+    use serial_test::serial;
+
     #[test]
+    #[serial]
     fn db_add_file_twice() {
         let mut pdb = get_pantsu_db(Some(std::env::current_dir().unwrap().as_path())).unwrap();
         pdb.clear().unwrap();
@@ -129,6 +132,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn db_update_file_source() {
         let mut pdb = get_pantsu_db(Some(std::env::current_dir().unwrap().as_path())).unwrap();
         pdb.clear().unwrap();
@@ -139,6 +143,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn db_add_tags_to_file() {
         let mut pdb = get_pantsu_db(Some(std::env::current_dir().unwrap().as_path())).unwrap();
         pdb.clear().unwrap();
@@ -155,6 +160,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn db_add_and_remove_file() {
         let mut pdb = get_pantsu_db(Some(std::env::current_dir().unwrap().as_path())).unwrap();
         pdb.clear().unwrap();
@@ -175,6 +181,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn db_add_and_remove_tags() {
         let mut pdb = get_pantsu_db(Some(std::env::current_dir().unwrap().as_path())).unwrap();
         pdb.clear().unwrap();
@@ -192,6 +199,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn db_get_tags_for_file() {
         let mut pdb = get_pantsu_db(Some(std::env::current_dir().unwrap().as_path())).unwrap();
         pdb.clear().unwrap();
@@ -216,6 +224,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn db_get_tags() {
         let mut pdb = get_pantsu_db(Some(std::env::current_dir().unwrap().as_path())).unwrap();
         pdb.clear().unwrap();
@@ -232,6 +241,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn db_get_general_tags() {
         let mut pdb = get_pantsu_db(Some(std::env::current_dir().unwrap().as_path())).unwrap();
         pdb.clear().unwrap();
@@ -252,6 +262,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn db_get_general_and_character_tags() {
         let mut pdb = get_pantsu_db(Some(std::env::current_dir().unwrap().as_path())).unwrap();
         pdb.clear().unwrap();
