@@ -35,6 +35,9 @@ pub enum Error {
     #[error("File not found: {1}")]
     FileNotFound(#[source] std::io::Error, String),
 
+    #[error("Cannot hard link file '{1}' into image library: {0}")]
+    HardLinkError(#[source] std::io::Error, String),
+
     #[error("Error creating dir {1}: {0}")]
     DirectoryCreateError(#[source] std::io::Error, String),
 

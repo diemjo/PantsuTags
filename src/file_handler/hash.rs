@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::PathBuf;
 use blockhash::Image;
 use image::{DynamicImage, GenericImageView, ImageError};
 use lz_fnv::{Fnv1a, FnvHasher};
@@ -18,8 +18,9 @@ impl Image for AdapterImage {
     }
 }
 
-pub fn calculate_filename(path: &Path) -> Result<String, Error>{
-    let file_content = std::fs::read(path).or_else(|_|
+pub fn calculate_filename(file: &str) -> Result<String, Error>{
+    let path = PathBuf::from(file);
+    let file_content = std::fs::read(&path).or_else(|_|
         Err(Error::ImageLoadError(String::from(path.to_str().unwrap_or("cannot display path"))))
     )?;
     let file_extension = path.extension().ok_or_else(||
