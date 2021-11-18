@@ -14,14 +14,8 @@ pub enum Error {
     #[error("Received response with bad http status: {0}")]
     BadResponseStatus(StatusCode),
 
-    #[error("Failed to find sauces for image: {0}")]
-    NoSaucesFound(String),
-
-    #[error("Failed to find tags on image website: {0}")]
-    NoTagsFound(String),
-
-    #[error("Error getting tags from html.")]
-    ErrorGettingTags,
+    #[error("Failed to parse html, maybe the website layout changed?")]
+    HtmlParseError,
 
     // pantsu tag database errors
     #[error("Primary key constraint error: {0}")]

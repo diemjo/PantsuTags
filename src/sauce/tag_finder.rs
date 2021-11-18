@@ -12,23 +12,19 @@ pub fn find_tags_gelbooru(url: &str) -> Result<Vec<PantsuTag>, Error> {
         return Err(Error::BadResponseStatus(response.status()));
     }
     let html = Document::from(response.text()?.as_str());
-    let tags = extract_tags(&html)?;
-
-    if tags.is_empty() {
-        return Err(Error::NoTagsFound(String::from(url)));
-    }
-    Ok(tags)
+    extract_tags(&html)
 }
 
 fn extract_tags(html: &Document) -> Result<Vec<PantsuTag>, Error> {
     let mut tags: Vec<PantsuTag> = Vec::new();
-    let tag_list = match html.find(Attr("id", "tag-list")).next() {
-        Some(tag_list) => tag_list,
-        None => return Ok(tags),
-    };
+    let tag_list = html.find(Attr("id", "tag-list")).next().ok_or(Error::HtmlParseError)?; // html should always contain the tag-list html element
     extract_rating(&tag_list, &mut tags)?;
     for tag_type in PantsuTagType::into_enum_iter() {
         extract_tags_of_type(&tag_list, tag_type, &mut tags);
+    }
+
+    if tags.is_empty() {
+        return Err(Error::HtmlParseError); // every gelbooru page has tags
     }
     Ok(tags)
 }
@@ -62,7 +58,7 @@ fn extract_rating(tag_list: &Node, result: &mut Vec<PantsuTag>) -> Result<(), Er
             None => {}
         }
     }
-    Err(Error::ErrorGettingTags)
+    Err(Error::HtmlParseError) // every gelbooru page has a rating
 }
 
 impl PantsuTagType {

@@ -1,6 +1,7 @@
 use std::path::Path;
 use reqwest::blocking::{Client, multipart};
 use select::document::Document;
+use select::node::Node;
 use select::predicate::{Attr, Name};
 use crate::common::error;
 use crate::common::error::Error;
@@ -8,6 +9,7 @@ use super::SauceMatch;
 
 const IQDB_ADDRESS: &str = "https://gelbooru.iqdb.org/";
 
+// image path has to point to an image, otherwise returns an Error::HtmlParseError
 pub fn find_sauce(image_path: &Path) -> Result<Vec<SauceMatch>, Error> {
     let client = Client::new();
     let form = multipart::Form::new()
@@ -22,21 +24,13 @@ pub fn find_sauce(image_path: &Path) -> Result<Vec<SauceMatch>, Error> {
 
     let response = response.text()?;
     let html = Document::from(response.as_str());
-    let sauces = extract_sauce(&html);
-
-    if sauces.is_empty() {
-        return Err(Error::NoSaucesFound(error::get_path(image_path)));
-    }
-    Ok(sauces)
+    extract_sauce(&html)
 }
 
-fn extract_sauce(html: &Document) -> Vec<SauceMatch> {
-    let mut res: Vec<SauceMatch> = Vec::new();
+fn extract_sauce(html: &Document) -> Result<Vec<SauceMatch>, Error> {
     let mut pages = html.find(Attr("id", "pages"));
-    let pages = match pages.next() {
-        Some(pages) => pages,
-        None => return res,
-    };
+    let pages = pages.next().ok_or(Error::HtmlParseError)?; // html element "pages" should always exist, even if there are no relevant matches. Maybe file wasn't an image?
+    let mut res: Vec<SauceMatch> = Vec::new();
 
     for (idx, img_match) in pages.children().enumerate() {
         if idx == 0 {
@@ -50,62 +44,16 @@ fn extract_sauce(html: &Document) -> Vec<SauceMatch> {
             match idx {
                 0 => continue,
                 1 => {
-                    let td_or_th = node.first_child();
-                    if td_or_th.is_none() {
+                    sauce_link = extract_sauce_link(node);
+                    if let None = sauce_link {
                         continue;
                     }
-                    let td_or_th = td_or_th.unwrap();
-
-                    if td_or_th.is(Name("th")) {
-                        break;
-                    }
-
-                    let link = td_or_th.first_child();
-                    if link.is_none() {
-                        break;
-                    }
-                    let href = link.unwrap().attr("href");
-                    if href.is_none() {
-                        break;
-                    }
-                    let href = href.unwrap();
-                    sauce_link = if href.starts_with("//") {
-                        Some("https:".to_string() + href)
-                    } else {
-                        Some(href.to_string())
-                    };
                 },
                 2 => {
-                    let td = node.first_child();
-                    if td.is_none() {
-                        break;
-                    }
-
-                    let td = td.unwrap();
-                    let text = td.text();
-                    let resolution = text.split_whitespace().next();
-                    if let Some(resolution) = resolution {
-                        let mut resolution = resolution.split('×');
-                        let resolution = (resolution.next(), resolution.next());
-                        if let (Some(resol1), Some(resol2)) = resolution {
-                            if let (Ok(resol1), Ok(resol2)) = (resol1.parse::<i32>(), resol2.parse::<i32>()) {
-                                sauce_resolution = Some((resol1, resol2));
-                            }
-                        }
-                    }
+                    sauce_resolution = extract_sauce_resolution(node);
                 },
                 3 => {
-                    let td = node.first_child();
-                    if td.is_none() {
-                        continue;
-                    }
-                    let td = td.unwrap();
-                    let text = td.text();
-                    let similarity = text.split('%').collect::<Vec<&str>>()[0];
-                    sauce_similarity = match similarity.parse::<i32>() {
-                        Ok(f) => Some(f),
-                        Err(_) => break,
-                    }
+                    sauce_similarity = extract_sauce_similarity(node);
                 }
                 _ => break,
             }
@@ -120,5 +68,69 @@ fn extract_sauce(html: &Document) -> Vec<SauceMatch> {
         }
     }
 
-    res
+    if res.is_empty() {
+        return Err(Error::HtmlParseError); // iqdb always returns matches
+    }
+
+    Ok(res)
+}
+
+fn extract_sauce_link(sauce_match_tr_element: Node) -> Option<String> {
+    let td_or_th = sauce_match_tr_element.first_child();
+    if td_or_th.is_none() {
+        return None;
+    }
+    let td_or_th = td_or_th.unwrap();
+
+    if td_or_th.is(Name("th")) {
+        return None;
+    }
+
+    let link = td_or_th.first_child();
+    if link.is_none() {
+        return None;
+    }
+    let href = link.unwrap().attr("href");
+    if href.is_none() {
+        return None
+    }
+    let href = href.unwrap();
+    if href.starts_with("//") {
+        Some("https:".to_string() + href)
+    } else {
+        Some(href.to_string())
+    }
+}
+
+fn extract_sauce_resolution(sauce_match_tr_element: Node) -> Option<(i32, i32)> {
+    let td = sauce_match_tr_element.first_child();
+    if td.is_none() {
+        return None;
+    }
+
+    let td = td.unwrap();
+    let text = td.text();
+    let resolution = text.split_whitespace().next();
+    if let Some(resolution) = resolution {
+        let mut resolution = resolution.split('×');
+        let resolution = (resolution.next(), resolution.next());
+        if let (Some(resol1), Some(resol2)) = resolution {
+            if let (Ok(resol1), Ok(resol2)) = (resol1.parse::<i32>(), resol2.parse::<i32>()) {
+                return Some((resol1, resol2));
+            }
+        }
+    }
+
+    None
+}
+
+fn extract_sauce_similarity(sauce_match_tr_element: Node) -> Option<i32> {
+    let td = sauce_match_tr_element.first_child();
+    if td.is_none() {
+        return None;
+    }
+    let td = td.unwrap();
+    let text = td.text();
+    let similarity = text.split('%').collect::<Vec<&str>>()[0];
+    similarity.parse::<i32>().ok()
 }
