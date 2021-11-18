@@ -41,5 +41,8 @@ pub enum Error {
     DirectoryCreateError(#[source] std::io::Error, String),
 
     #[error("File '{0}' is not an image or cannot be loaded as an image")]
-    ImageLoadError(String)
+    ImageLoadError(String),
+
+    #[error("'{0}' is not a file")]
+    InvalidDatabasePath(String)
 }
