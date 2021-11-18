@@ -43,7 +43,7 @@ fn extract_sauce(html: &Document) -> Vec<SauceMatch> {
         }
 
         let mut sauce_link: Option<String> = None;
-        let mut sauce_similarity: Option<f32> = None;
+        let mut sauce_similarity: Option<i32> = None;
         let mut sauce_resolution: Option<(i32, i32)> = None;
         for (idx, node) in img_match.find(Name("tr")).enumerate() {
             match idx {
@@ -101,7 +101,7 @@ fn extract_sauce(html: &Document) -> Vec<SauceMatch> {
                     let td = td.unwrap();
                     let text = td.text();
                     let similarity = text.split('%').collect::<Vec<&str>>()[0];
-                    sauce_similarity = match similarity.parse::<f32>() {
+                    sauce_similarity = match similarity.parse::<i32>() {
                         Ok(f) => Some(f),
                         Err(_) => break,
                     }

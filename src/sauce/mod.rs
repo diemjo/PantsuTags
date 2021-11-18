@@ -3,19 +3,25 @@ use std::cmp::Ordering;
 pub mod tag_finder;
 pub mod sauce_finder;
 
+#[derive(Eq)]
 pub struct SauceMatch {
     pub link: String,
-    pub similarity: f32,
+    pub similarity: i32,
     pub resolution: (i32, i32),
+}
+
+impl Ord for SauceMatch {
+    fn cmp(&self, other: &Self) -> Ordering {
+        match self.similarity.cmp(&other.similarity) {
+            Ordering::Equal => self.resolution.cmp(&other.resolution),
+            other => other,
+        }
+    }
 }
 
 impl PartialOrd for SauceMatch {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        match self.similarity.partial_cmp(&other.similarity) {
-            Some(Ordering::Equal) => Some(self.resolution.cmp(&other.resolution)),
-            Some(other) => Some(other),
-            None => None,
-        }
+        Some(self.cmp(other))
     }
 }
 
@@ -30,13 +36,14 @@ mod tests {
     use std::path::Path;
     use crate::common::pantsu_tag::{PantsuTag, PantsuTagType};
     use crate::sauce::{sauce_finder, tag_finder};
+    use crate::SauceMatch;
 
     #[test]
     fn find_sauce() {
         let path = Path::new("test.png");
         let sauces = sauce_finder::find_sauce(&path).unwrap();
         assert_eq!(sauces[0].link, "http://gelbooru.com/index.php?page=post&s=list&md5=4f76b8d52983af1d28b1bf8d830d684e");
-        assert_eq!(sauces[0].similarity, 96.0);
+        assert_eq!(sauces[0].similarity, 96);
         assert_eq!(sauces[0].resolution, (533, 745));
     }
 
@@ -85,5 +92,62 @@ mod tests {
         for tag in tags {
             assert!(tag.0.iter().any(|t| t.tag_name.eq(tag.1) && matches!(t.tag_type, PantsuTagType::Rating)))
         }
+    }
+
+    #[test]
+    fn sort_sauce_matches() {
+        let mut matches_list: Vec<SauceMatch> = vec![
+            SauceMatch {
+                link: String::from("a"),
+                similarity: 50,
+                resolution: (10,10),
+            },
+            SauceMatch {
+                link: String::from("b"),
+                similarity: 60,
+                resolution: (5,5),
+            },
+            SauceMatch {
+                link: String::from("c"),
+                similarity: 51,
+                resolution: (9,0),
+            },
+            SauceMatch {
+                link: String::from("d"),
+                similarity: 49,
+                resolution: (20,20),
+            },
+            SauceMatch {
+                link: String::from("e"),
+                similarity: 50,
+                resolution: (12,12),
+            },
+            SauceMatch {
+                link: String::from("f"),
+                similarity: 50,
+                resolution: (12,0),
+            },
+            SauceMatch {
+                link: String::from("g"),
+                similarity: 50,
+                resolution: (0,12),
+            },
+
+        ];
+        matches_list.sort();
+        let mut iter = matches_list.iter();
+        assert_eq!(iter.next().unwrap().link, "d");
+        assert_eq!(iter.next().unwrap().link, "g");
+        assert_eq!(iter.next().unwrap().link, "a");
+        assert_eq!(iter.next().unwrap().link, "f");
+        assert_eq!(iter.next().unwrap().link, "e");
+        assert_eq!(iter.next().unwrap().link, "c");
+        assert_eq!(iter.next().unwrap().link, "b");
+
+        assert!(matches_list[0].eq(&matches_list[0]));
+
+        //for (idx, m) in matches_list.iter().enumerate() {
+        //    println!("list {}: {}, {}, ({},{})", idx, m.link, m.similarity, m.resolution.0, m.resolution.1);
+        //}
     }
 }

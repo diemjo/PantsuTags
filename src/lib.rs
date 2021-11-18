@@ -8,8 +8,8 @@ pub mod common;
 pub mod db;
 pub mod file_handler;
 
-const SIMILARITY_GOOD: f32 = 80.0;
-const SIMILARITY_UNSURE: f32 = 50.0;
+const SIMILARITY_GOOD: i32 = 80;
+const SIMILARITY_UNSURE: i32 = 50;
 
 pub enum SauceQuality {
     Found,
@@ -25,8 +25,8 @@ pub fn add_image(image_path: &Path) -> Result<(SauceQuality, Vec<SauceMatch>), E
 
     // file_handler: check whether file already exists
 
-    let sauce_matches = sauce_finder::find_sauce(image_path)?;
-    //sauce_matches.sort();
+    let mut sauce_matches = sauce_finder::find_sauce(image_path)?;
+    sauce_matches.sort();
     let best_match = &sauce_matches[0];
     return if best_match.similarity >= SIMILARITY_GOOD {
         let tags = tag_finder::find_tags_gelbooru(&best_match.link)?;
