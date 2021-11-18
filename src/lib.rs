@@ -57,3 +57,33 @@ pub fn add_tags_to_image(pantsu_db: &mut PantsuDB, image_name: &str, source: &st
     pantsu_db.add_file_and_tags(&ImageFile { filename: String::from(image_name), file_source: Some(String::from(source))}, tags)?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use std::io::Cursor;
+    use std::path::PathBuf;
+    use crate::{add_image, PantsuDB};
+
+    #[test]
+    fn test_add_image() {
+        let mut db_path = std::env::current_dir().unwrap();
+        db_path.push("pantsu_tags.db");
+        let mut pdb = PantsuDB::new(&db_path).unwrap();
+        let image_path = prepare_image("https://img1.gelbooru.com/images/4f/76/4f76b8d52983af1d28b1bf8d830d684e.png");
+        add_image(&mut pdb, image_path.as_path()).unwrap();
+    }
+
+    fn prepare_image(image_link: &str) -> PathBuf {
+        let image_name = image_link.rsplit('/').next().unwrap();
+        let image_path = PathBuf::from(format!("test_image_{}", image_name));
+        if image_path.exists() {
+            return image_path;
+        }
+
+        let response = reqwest::blocking::get(image_link).unwrap();
+        let mut file = std::fs::File::create(&image_path).unwrap();
+        let mut content =  Cursor::new(response.bytes().unwrap());
+        std::io::copy(&mut content, &mut file).unwrap();
+        image_path
+    }
+}
