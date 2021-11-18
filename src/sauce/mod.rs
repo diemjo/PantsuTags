@@ -33,16 +33,34 @@ impl PartialEq for SauceMatch {
 
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
+    use std::io::Cursor;
+    use std::path::PathBuf;
     use crate::common::pantsu_tag::{PantsuTag, PantsuTagType};
     use crate::sauce::{sauce_finder, tag_finder};
     use crate::SauceMatch;
 
+    fn prepare_image(image_link: &str) -> PathBuf {
+        let image_name = image_link.rsplit('/').next().unwrap();
+        let image_path = PathBuf::from(format!("test_image_{}", image_name));
+        if image_path.exists() {
+            return image_path;
+        }
+
+        let response = reqwest::blocking::get(image_link).unwrap();
+        let mut file = std::fs::File::create(&image_path).unwrap();
+        let mut content =  Cursor::new(response.bytes().unwrap());
+        std::io::copy(&mut content, &mut file).unwrap();
+        image_path
+    }
+
     #[test]
     fn find_sauce() {
-        let path = Path::new("test.png");
+        let sauce_link = "http://gelbooru.com/index.php?page=post&s=list&md5=4f76b8d52983af1d28b1bf8d830d684e";
+        let image_link = "https://img1.gelbooru.com/images/4f/76/4f76b8d52983af1d28b1bf8d830d684e.png";
+        let path = prepare_image(image_link);
+
         let sauces = sauce_finder::find_sauce(&path).unwrap();
-        assert_eq!(sauces[0].link, "http://gelbooru.com/index.php?page=post&s=list&md5=4f76b8d52983af1d28b1bf8d830d684e");
+        assert_eq!(sauces[0].link, sauce_link);
         assert_eq!(sauces[0].similarity, 96);
         assert_eq!(sauces[0].resolution, (533, 745));
     }
