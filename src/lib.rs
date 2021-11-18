@@ -1,10 +1,11 @@
 use std::path::Path;
 use crate::common::error::Error;
+use crate::common::file_handle::FileHandle;
 use crate::common::pantsu_tag::PantsuTag;
 use crate::sauce::{sauce_finder, SauceMatch, tag_finder};
 
 pub mod sauce;
-pub mod common;
+mod common;
 pub mod db;
 pub mod file_handler;
 
@@ -15,6 +16,11 @@ pub enum SauceQuality {
     Found,
     Unsure,
     NotFound,
+}
+
+pub fn get_file_handle() -> FileHandle {
+
+    FileHandle::new(String::from(""))
 }
 
 pub fn add_image(image_path: &Path) -> Result<(SauceQuality, Vec<SauceMatch>), Error>{
