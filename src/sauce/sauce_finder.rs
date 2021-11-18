@@ -2,6 +2,7 @@ use std::path::Path;
 use reqwest::blocking::{Client, multipart};
 use select::document::Document;
 use select::predicate::{Attr, Name};
+use crate::common::error;
 use crate::common::error::Error;
 use super::SauceMatch;
 
@@ -11,7 +12,7 @@ pub fn find_sauce(image_path: &Path) -> Result<Vec<SauceMatch>, Error> {
     let client = Client::new();
     let form = multipart::Form::new()
         .file("file", image_path).or_else(
-        |err| Err(Error::FileNotFound(err, get_path(image_path))))?;
+        |err| Err(Error::FileNotFound(err, error::get_path(image_path))))?;
     let response = client.post(IQDB_ADDRESS)
         .multipart(form)
         .send()?;
@@ -24,7 +25,7 @@ pub fn find_sauce(image_path: &Path) -> Result<Vec<SauceMatch>, Error> {
     let sauces = extract_sauce(&html);
 
     if sauces.is_empty() {
-        return Err(Error::NoSaucesFound(get_path(image_path)));
+        return Err(Error::NoSaucesFound(error::get_path(image_path)));
     }
     Ok(sauces)
 }
@@ -120,8 +121,4 @@ fn extract_sauce(html: &Document) -> Vec<SauceMatch> {
     }
 
     res
-}
-
-fn get_path(path: &Path) -> String {
-    String::from(path.to_str().unwrap_or_default())
 }

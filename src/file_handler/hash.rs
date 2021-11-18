@@ -2,6 +2,7 @@ use std::path::PathBuf;
 use blockhash::Image;
 use image::{DynamicImage, GenericImageView, ImageError};
 use lz_fnv::{Fnv1a, FnvHasher};
+use crate::common::error;
 use crate::common::error::Error;
 
 struct AdapterImage {
@@ -21,17 +22,17 @@ impl Image for AdapterImage {
 pub fn calculate_filename(file: &str) -> Result<String, Error>{
     let path = PathBuf::from(file);
     let file_content = std::fs::read(&path).or_else(|_|
-        Err(Error::ImageLoadError(String::from(path.to_str().unwrap_or("cannot display path"))))
+        Err(Error::ImageLoadError(error::get_path(&path)))
     )?;
     let file_extension = path.extension().ok_or_else(||
-        Error::ImageLoadError(String::from(path.to_str().unwrap_or("cannot display path")))
+        Error::ImageLoadError(error::get_path(&path))
     )?;
     let file_extension = file_extension.to_str().ok_or_else(||
-        Error::ImageLoadError(String::from(path.to_str().unwrap_or("cannot display path")))
+        Error::ImageLoadError(error::get_path(&path))
     )?;
     let fnv1a_hash = get_fnv1a_hash(&file_content);
     let perceptual_hash = get_perceptual_hash(&file_content).or_else(|_|
-        Err(Error::ImageLoadError(String::from(path.to_str().unwrap_or("cannot display path"))))
+        Err(Error::ImageLoadError(error::get_path(&path)))
     )?;
     Ok(format!("{}-{}.{}", fnv1a_hash, perceptual_hash, file_extension))
 }

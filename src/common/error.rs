@@ -1,4 +1,9 @@
+use std::path::Path;
 use reqwest::StatusCode;
+
+pub fn get_path(path: &Path) -> String {
+    String::from(path.to_str().unwrap_or("cannot display path"))
+}
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
