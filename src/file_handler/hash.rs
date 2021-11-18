@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::Path;
 use blockhash::Image;
 use image::{DynamicImage, GenericImageView, ImageError};
 use lz_fnv::{Fnv1a, FnvHasher};
@@ -19,21 +19,17 @@ impl Image for AdapterImage {
     }
 }
 
-pub fn calculate_filename(file: &str) -> Result<String, Error>{
-    let path = PathBuf::from(file);
+pub fn calculate_filename(path: &Path) -> Result<String, Error>{
     let file_content = std::fs::read(&path).or_else(|_|
         Err(Error::ImageLoadError(error::get_path(&path)))
     )?;
-    let file_extension = path.extension().ok_or_else(||
-        Error::ImageLoadError(error::get_path(&path))
-    )?;
-    let file_extension = file_extension.to_str().ok_or_else(||
-        Error::ImageLoadError(error::get_path(&path))
-    )?;
+    let file_extension = get_file_extension(&path)?;
+
     let fnv1a_hash = get_fnv1a_hash(&file_content);
     let perceptual_hash = get_perceptual_hash(&file_content).or_else(|_|
         Err(Error::ImageLoadError(error::get_path(&path)))
     )?;
+
     Ok(format!("{}-{}.{}", fnv1a_hash, perceptual_hash, file_extension))
 }
 
@@ -47,4 +43,14 @@ fn get_perceptual_hash(bytes: &[u8]) -> Result<String, ImageError> {
     let image = image::load_from_memory(bytes)?;
     let hash = blockhash::blockhash144(&AdapterImage { image });
     Ok(hash.to_string())
+}
+
+fn get_file_extension(path: &Path) -> Result<String, Error> {
+    let file_extension = path.extension().ok_or_else(||
+        Error::ImageLoadError(error::get_path(&path))
+    )?;
+    let file_extension = file_extension.to_str().ok_or_else(||
+        Error::ImageLoadError(error::get_path(&path))
+    )?;
+    Ok(String::from(file_extension))
 }

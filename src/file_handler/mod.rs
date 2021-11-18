@@ -6,25 +6,23 @@ mod tests {
     use std::io::Cursor;
     use std::path::PathBuf;
     use crate::file_handler::hash::calculate_filename;
-    use crate::file_handler::import::import_file;
+    use crate::file_handler::import;
 
     #[test]
     fn test_hash() {
         let file = "https://img1.gelbooru.com/images/4f/76/4f76b8d52983af1d28b1bf8d830d684e.png";
         let file_path = prepare_image(file);
-        let file_name = file_path.file_name().unwrap().to_str().unwrap();
-        let hash_name = calculate_filename(file_name).unwrap();
-        println!("{} -> {}", file_name, hash_name);
+        let hash_name = calculate_filename(&file_path).unwrap();
+        println!("{} -> {}", file_path.file_name().unwrap().to_str().unwrap(), hash_name);
     }
 
     #[test]
     fn test_hard_link() {
         let file = "https://img1.gelbooru.com/images/4f/76/4f76b8d52983af1d28b1bf8d830d684e.png";
         let file_path = prepare_image(file);
-        let file_name = file_path.file_name().unwrap().to_str().unwrap();
-        let new_filename = calculate_filename(file_name).unwrap();
+        let new_filename = calculate_filename(&file_path).unwrap();
         let lib_dir = "./";
-        import_file(lib_dir, file_name, &new_filename).unwrap();
+        import::import_file(lib_dir, &file_path, &new_filename).unwrap();
         let mut new_path = PathBuf::from(lib_dir);
         new_path.push(new_filename);
         assert!(new_path.exists());
