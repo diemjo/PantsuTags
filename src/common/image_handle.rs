@@ -1,17 +1,17 @@
 
-pub struct FileHandle {
+pub struct ImageHandle {
     filename: String
 }
 
-impl FileHandle {
+impl ImageHandle {
     pub fn get_filename(&self) -> &str {
         &self.filename
     }
 }
 
-impl FileHandle {
+impl ImageHandle {
     pub(in crate) fn new(filename: String) -> Self {
-        FileHandle {
+        ImageHandle {
             filename,
         }
     }

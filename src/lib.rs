@@ -1,6 +1,6 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use crate::common::error::Error;
-use crate::common::file_handle::FileHandle;
+use crate::common::image_handle::ImageHandle;
 use crate::common::image_file::ImageFile;
 use crate::common::pantsu_tag::PantsuTag;
 use crate::db::PantsuDB;
@@ -20,13 +20,64 @@ pub enum SauceQuality {
     Unsure,
     NotFound,
 }
-
-pub fn get_file_handle() -> FileHandle {
-
-    FileHandle::new(String::from(""))
+impl SauceQuality {
+    fn get_quality(similarity: i32) -> Self {
+        if similarity >= SIMILARITY_GOOD {
+            SauceQuality::Found
+        } else if similarity >= SIMILARITY_UNSURE {
+            SauceQuality::Unsure
+        } else {
+            SauceQuality::NotFound
+        }
+    }
 }
 
-pub fn add_image(pantsu_db: &mut PantsuDB, image_path: &Path) -> Result<(SauceQuality, Vec<SauceMatch>), Error>{
+pub fn new_image_handle(pantsu_db: &PantsuDB, image_path: &Path) -> Result<ImageHandle, Error> {
+    let image_name = file_handler::hash::calculate_filename(image_path)?;
+
+    if pantsu_db.get_file(&image_name)?.is_some() {
+        // todo return error: file already exists
+    }
+
+    import::import_file("./test_image_lib/", image_path, &image_name)?;
+    Ok(ImageHandle::new(String::from(image_name)))
+}
+
+pub fn get_image_sauces(image: &ImageHandle) -> Result<(SauceQuality, Vec<SauceMatch>), Error> {
+    let image_path = PathBuf::from(format!("./test_image_lib/{}", image.get_filename()));
+    let mut sauce_matches = sauce_finder::find_sauce(&image_path)?;
+    sauce_matches.sort();
+    sauce_matches.reverse();
+    let best_match = &sauce_matches[0];
+    let quality = SauceQuality::get_quality(best_match.similarity);
+    Ok((quality, sauce_matches))
+}
+
+pub fn get_sauce_tags(sauce: &SauceMatch) -> Result<Vec<PantsuTag>, Error> {
+    tag_finder::find_tags_gelbooru(&sauce.link)
+}
+
+pub fn store_image_with_tags_from_sauce(pantsu_db: &mut PantsuDB, image: &ImageHandle, sauce: &SauceMatch, tags: &Vec<PantsuTag>) -> Result<(), Error> {
+    pantsu_db.add_file_and_tags(
+        &ImageFile {
+            filename: String::from(image.get_filename()),
+            file_source: Some(String::from(&sauce.link)),
+        },
+        tags
+    )
+}
+
+pub fn store_image_with_tags(pantsu_db: &mut PantsuDB, image: &ImageHandle, tags: &Vec<PantsuTag>) -> Result<(), Error> {
+    pantsu_db.add_file_and_tags(
+        &ImageFile {
+            filename: String::from(image.get_filename()),
+            file_source: None,
+        },
+        tags
+    )
+}
+
+pub fn add_image(pantsu_db: &mut PantsuDB, image_path: &Path) -> Result<(SauceQuality, Vec<SauceMatch>), Error> {
     // opt: check whether file is image
 
     // file_handler: get file name

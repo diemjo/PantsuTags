@@ -3,9 +3,9 @@ use std::path::{Path, PathBuf};
 use crate::common::error;
 
 use crate::common::error::Error;
-use crate::FileHandle;
+use crate::ImageHandle;
 
-pub fn import_file(lib: &str, file: &Path, new_filename: &str) -> Result<FileHandle, Error> {
+pub fn import_file(lib: &str, file: &Path, new_filename: &str) -> Result<ImageHandle, Error> {
     let lib_path = PathBuf::from(lib);
     std::fs::create_dir_all(&lib_path).or_else(|err|
         Err(Error::DirectoryCreateError(err, String::from(lib)))
@@ -20,5 +20,5 @@ pub fn import_file(lib: &str, file: &Path, new_filename: &str) -> Result<FileHan
             Err(Error::HardLinkError(err, error::get_path(file)))
         }
     })?;
-    Ok(FileHandle::new(String::from(new_filename)))
+    Ok(ImageHandle::new(String::from(new_filename)))
 }
