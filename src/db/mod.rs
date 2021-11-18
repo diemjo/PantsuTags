@@ -1,4 +1,6 @@
+use std::path::{Path, PathBuf};
 use rusqlite::{Connection};
+use crate::common::error;
 use crate::common::error::Error;
 use crate::common::image_file::ImageFile;
 use crate::common::pantsu_tag::{PantsuTag, PantsuTagType};
@@ -12,7 +14,14 @@ pub struct PantsuDB {
 }
 
 impl PantsuDB {
-    pub fn new(db_path: &str) -> Result<PantsuDB, Error> {
+    pub fn new(db_path: &Path) -> Result<PantsuDB, Error> {
+        if db_path.eq(Path::new("/")) {
+            return Err(Error::InvalidDatabasePath(error::get_path(db_path)));
+        }
+        let path_buf = PathBuf::from(db_path);
+        std::fs::create_dir_all(path_buf.parent().unwrap()).or_else(|e|
+            Err(Error::DirectoryCreateError(e, error::get_path(db_path)))
+        )?;
         let conn = db_init::open(db_path)?;
         Ok(PantsuDB { conn })
     }
@@ -297,20 +306,17 @@ mod tests {
     fn get_pantsu_db(path: Option<&Path>) -> Result<PantsuDB, Error> {
         let mut db_path : PathBuf = match path {
             Some(path) => PathBuf::from(path),
-            None => get_or_create_data_dir().unwrap()
+            None => get_data_dir().unwrap()
         };
         db_path.push("pantsu_tags.db");
-        Ok(PantsuDB::new(db_path.as_path().to_str().unwrap())?)
+        Ok(PantsuDB::new(db_path.as_path())?)
     }
 
-    fn get_or_create_data_dir() -> Result<PathBuf, Error> {
+    fn get_data_dir() -> Result<PathBuf, Error> {
         match directories::ProjectDirs::from("moe", "karpador", "PantsuTags") {
             Some(project_dir) => {
                 let mut path = PathBuf::new();
                 path.push(project_dir.data_dir());
-                std::fs::create_dir_all(&path).or_else(|e|
-                    Err(Error::DirectoryCreateError(e, path.as_path().to_str().unwrap().to_string()))
-                )?;
                 Ok(path)
             },
             None => panic!("No valid home dir found")
