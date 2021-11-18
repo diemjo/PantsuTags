@@ -59,7 +59,7 @@ impl PantsuDB {
         Ok(())
     }
 
-    pub fn get_file(&self, filename: &str) -> Result<ImageFile, Error> {
+    pub fn get_file(&self, filename: &str) -> Result<Option<ImageFile>, Error> {
         db_calls::get_file(&self.conn, filename)
     }
 
@@ -78,6 +78,17 @@ impl PantsuDB {
     pub fn add_tags(&mut self, file: &ImageFile, tags: &Vec<PantsuTag>) -> Result<(), Error> {
         let transaction = self.conn.transaction()?;
 
+        db_calls::add_tags_to_tag_list(&transaction, tags)?;
+        db_calls::add_tags_to_file_tags(&transaction, file, tags)?;
+
+        transaction.commit()?;
+        Ok(())
+    }
+
+    pub fn add_file_and_tags(&mut self, file: &ImageFile, tags: &Vec<PantsuTag>) -> Result<(), Error> {
+        let transaction = self.conn.transaction()?;
+
+        db_calls::add_file_to_file_list(&transaction, file)?;
         db_calls::add_tags_to_tag_list(&transaction, tags)?;
         db_calls::add_tags_to_file_tags(&transaction, file, tags)?;
 
@@ -139,7 +150,7 @@ mod tests {
         let img = &get_test_image();
         pdb.add_file(img).unwrap();
         pdb.update_file_source(&ImageFile{ filename: img.filename.clone(), file_source: Some(String::from("https://fake.url")) }).unwrap();
-        assert_eq!(pdb.get_file(&img.filename).unwrap().file_source, Some(String::from("https://fake.url")));
+        assert_eq!(pdb.get_file(&img.filename).unwrap().unwrap().file_source, Some(String::from("https://fake.url")));
     }
 
     #[test]

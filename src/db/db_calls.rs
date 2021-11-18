@@ -84,7 +84,7 @@ pub fn clear_all_tags(transaction: &Transaction) -> Result<(), Error> {
 }
 
 // SELECT
-pub fn get_file(connection: &Connection, filename: &str) -> Result<ImageFile, Error> {
+pub fn get_file(connection: &Connection, filename: &str) -> Result<Option<ImageFile>, Error> {
     let mut stmt = connection.prepare(sqlite_statements::SELECT_FILE)?;
     query_helpers::query_row_as_file(&mut stmt, [filename])
 }
@@ -130,7 +130,7 @@ mod query_helpers {
     use crate::common::image_file::ImageFile;
     use crate::common::pantsu_tag::PantsuTag;
 
-    pub fn query_row_as_file<P: Params>(stmt: &mut Statement, params: P) -> Result<ImageFile, Error> {
+    pub fn query_row_as_file<P: Params>(stmt: &mut Statement, params: P) -> Result<Option<ImageFile>, Error> {
         let file = stmt.query_row(params, |row| {
             Ok(
                 ImageFile {
@@ -139,7 +139,11 @@ mod query_helpers {
                 }
             )
         });
-        Ok(file?)
+         match file {
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Ok(file) => Ok(Some(file)),
+            Err(e) => Err(e)?
+        }
     }
 
     pub fn query_rows_as_files<P: Params>(stmt: &mut Statement, params: P) -> Result<Vec<ImageFile>, Error> {

@@ -28,7 +28,7 @@ mod tests {
         let mut new_path = PathBuf::from(lib_dir);
         new_path.push(new_filename);
         assert!(new_path.exists());
-        std::fs::remove_file(new_path);
+        std::fs::remove_file(new_path).unwrap();
     }
 
     fn prepare_image(image_link: &str) -> PathBuf {
