@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 use crate::common::error;
 use crate::common::image_handle::ImageHandle;
 use crate::common::image_file::ImageFile;
-use crate::common::pantsu_tag::PantsuTag;
+pub use crate::common::pantsu_tag::PantsuTag;
 use crate::db::PantsuDB;
 use crate::error::Error;
 use crate::file_handler::import;
