@@ -84,7 +84,7 @@ impl PantsuDB {
         db_calls::get_all_files(&self.conn)
     }
 
-    pub fn get_files_with_tags(&self, tags: &Vec<PantsuTag>) -> Result<Vec<ImageFile>, Error> {
+    pub fn get_files_with_tags(&self, tags: &Vec<String>) -> Result<Vec<ImageFile>, Error> {
         if tags.len() == 0 {
             return self.get_all_files();
         }
@@ -142,14 +142,13 @@ impl PantsuDB {
 
 #[cfg(test)]
 mod tests {
-    use std::path::{Path, PathBuf};
+    use std::path::Path;
     use crate::common::pantsu_tag::{PantsuTag, PantsuTagType};
     use crate::common::error::Error;
     use crate::common::image_file::ImageFile;
     use crate::db::PantsuDB;
 
     use serial_test::serial;
-    use crate::file_handler;
 
     #[test]
     #[serial]
@@ -257,7 +256,6 @@ mod tests {
     fn db_get_tags() {
         let mut pdb = get_pantsu_db(Some(std::env::current_dir().unwrap().as_path())).unwrap();
         pdb.clear().unwrap();
-        assert_eq!(pdb.get_all_tags().unwrap().len(), 0);
         let tags_to_add = vec![
             "general:Haha".parse().unwrap(),
             "artist:Hehe".parse().unwrap(),
@@ -267,6 +265,25 @@ mod tests {
         pdb.add_tags(&get_test_image(), &tags_to_add).unwrap();
         let all_tags = pdb.get_all_tags().unwrap();
         assert_eq!(all_tags, tags_to_add);
+    }
+
+    #[test]
+    #[serial]
+    fn db_get_files_with_tags() {
+        let mut pdb = get_pantsu_db(Some(std::env::current_dir().unwrap().as_path())).unwrap();
+        pdb.clear().unwrap();
+        let tags_to_add = vec![
+            "general:Haha".parse().unwrap(),
+            "artist:Hehe".parse().unwrap(),
+            "character:Hihi".parse().unwrap(),
+        ];
+        pdb.add_file_and_tags(&get_test_image(), &tags_to_add).unwrap();
+        pdb.add_file_and_tags(&get_test_image2(), &tags_to_add).unwrap();
+        pdb.add_tags(&get_test_image2(), &vec!["general:Huhu".parse().unwrap()]).unwrap();
+        let files = pdb.get_files_with_tags(&vec![String::from("Haha")]).unwrap();
+        assert_eq!(files.len(), 2);
+        let files = pdb.get_files_with_tags(&vec![String::from("Huhu")]).unwrap();
+        assert_eq!(files.len(), 1);
     }
 
     #[test]
@@ -314,16 +331,22 @@ mod tests {
 
     fn get_pantsu_db(path: Option<&Path>) -> Result<PantsuDB, Error> {
         match path {
-            None => PantsuDB::new(std::env::current_dir().unwrap().as_path()),
-            Some(path) => PantsuDB::new(path)
+            None => PantsuDB::new(&std::env::current_dir().unwrap().as_path().join("pantsu_tags.db")),
+            Some(path) => {
+                if path.is_dir() {
+                    PantsuDB::new(&path.join("pantsu_tags.db"))
+                } else {
+                    PantsuDB::new(path)
+                }
+            }
         }
     }
 
     fn get_test_image() -> ImageFile {
-        ImageFile { filename: String::from("file001.png"), file_source: None }
+        ImageFile { filename: String::from("test_image_1db8ab6c94e95f36a9dd5bde347f6dd1.png"), file_source: None }
     }
 
     fn get_test_image2() -> ImageFile {
-        ImageFile { filename: String::from("file002.png"), file_source: Some(String::from("http://real.url")) }
+        ImageFile { filename: String::from("test_image_4f76b8d52983af1d28b1bf8d830d684e.png"), file_source: Some(String::from("http://real.url")) }
     }
 }

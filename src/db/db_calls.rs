@@ -94,12 +94,12 @@ pub fn get_all_files(connection: &Connection) -> Result<Vec<ImageFile>, Error> {
     query_helpers::query_rows_as_files(&mut stmt, [])
 }
 
-pub fn get_files_with_tags(connection: &Connection, tags: &Vec<PantsuTag>) -> Result<Vec<ImageFile>, Error> {
+pub fn get_files_with_tags(connection: &Connection, tags: &Vec<String>) -> Result<Vec<ImageFile>, Error> {
     let formatted_stmt = sqlite_statements::SELECT_FILES_FOR_TAGS
         .replace(sqlite_statements::SELECT_FILES_FOR_TAGS_PLACEHOLDER, &query_helpers::repeat_vars(tags.len()));
     let mut stmt = connection.prepare(&formatted_stmt)?;
 
-    let params = rusqlite::params_from_iter(tags.iter().map(|t| &t.tag_name).into_iter());
+    let params = rusqlite::params_from_iter(tags.iter());
     query_helpers::query_rows_as_files(&mut stmt, params)
 }
 
