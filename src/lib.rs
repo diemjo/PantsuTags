@@ -43,7 +43,7 @@ pub fn new_image_handle(pantsu_db: &PantsuDB, image_path: &Path, error_on_simila
     if error_on_similar {
         let similar = get_similar_images(&pantsu_db, &image_name, 10)?;
         if similar.len()>0 {
-            return Err(Error::SimilarImagesExist(similar))
+            return Err(Error::SimilarImagesExist(image_name, similar))
         }
     }
 

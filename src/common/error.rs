@@ -34,8 +34,8 @@ pub enum Error {
     #[error("Cannot convert tag string '{0}' to PantsuTag")]
     InvalidTagFormat(String),
 
-    #[error("Similar images to '{0:?}' already exist in database")]
-    SimilarImagesExist(Vec<String>),
+    #[error("Similar images to '{0}' already exist in database: '{1:?}'")]
+    SimilarImagesExist(String, Vec<String>),
 
     // file system
     #[error("File not found: {1}")]
