@@ -1,5 +1,19 @@
+use std::path::PathBuf;
+use directories::ProjectDirs;
+
 pub mod hash;
 pub mod import;
+
+pub fn get_data_dir() -> PathBuf {
+    match ProjectDirs::from("moe", "karpador", "PantsuTags") {
+        Some(project_dir) => {
+            let mut path = PathBuf::new();
+            path.push(project_dir.data_dir());
+            path
+        },
+        None => panic!("No valid home dir found")
+    }
+}
 
 #[cfg(test)]
 mod tests {

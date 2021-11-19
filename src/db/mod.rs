@@ -4,6 +4,7 @@ use crate::common::error;
 use crate::common::error::Error;
 use crate::common::image_file::ImageFile;
 use crate::common::pantsu_tag::{PantsuTag, PantsuTagType};
+use crate::file_handler;
 
 mod db_calls;
 mod sqlite_statements;
@@ -14,6 +15,13 @@ pub struct PantsuDB {
 }
 
 impl PantsuDB {
+
+    pub fn default() -> Result<PantsuDB, Error> {
+        let mut data_dir = file_handler::get_data_dir();
+        data_dir.push("pantsu_tags.db");
+        PantsuDB::new(&data_dir)
+    }
+
     pub fn new(db_path: &Path) -> Result<PantsuDB, Error> {
         if db_path.eq(Path::new("/")) {
             return Err(Error::InvalidDatabasePath(error::get_path(db_path)));
@@ -141,6 +149,7 @@ mod tests {
     use crate::db::PantsuDB;
 
     use serial_test::serial;
+    use crate::file_handler;
 
     #[test]
     #[serial]
@@ -304,22 +313,9 @@ mod tests {
     }
 
     fn get_pantsu_db(path: Option<&Path>) -> Result<PantsuDB, Error> {
-        let mut db_path : PathBuf = match path {
-            Some(path) => PathBuf::from(path),
-            None => get_data_dir().unwrap()
-        };
-        db_path.push("pantsu_tags.db");
-        Ok(PantsuDB::new(db_path.as_path())?)
-    }
-
-    fn get_data_dir() -> Result<PathBuf, Error> {
-        match directories::ProjectDirs::from("moe", "karpador", "PantsuTags") {
-            Some(project_dir) => {
-                let mut path = PathBuf::new();
-                path.push(project_dir.data_dir());
-                Ok(path)
-            },
-            None => panic!("No valid home dir found")
+        match path {
+            None => PantsuDB::new(std::env::current_dir().unwrap().as_path()),
+            Some(path) => PantsuDB::new(path)
         }
     }
 
