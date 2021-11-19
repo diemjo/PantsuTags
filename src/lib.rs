@@ -1,4 +1,5 @@
 use std::path::{Path, PathBuf};
+use crate::common::error;
 use crate::common::error::Error;
 use crate::common::image_handle::ImageHandle;
 use crate::common::image_file::ImageFile;
@@ -36,7 +37,7 @@ pub fn new_image_handle(pantsu_db: &PantsuDB, image_path: &Path) -> Result<Image
     let image_name = file_handler::hash::calculate_filename(image_path)?;
 
     if pantsu_db.get_file(&image_name)?.is_some() {
-        // todo return error: file already exists
+        return Err(Error::ImageAlreadyExists(error::get_path(image_path)));
     }
 
     import::import_file("./test_image_lib/", image_path, &image_name)?;
@@ -77,43 +78,11 @@ pub fn store_image_with_tags(pantsu_db: &mut PantsuDB, image: &ImageHandle, tags
     )
 }
 
-pub fn add_image(pantsu_db: &mut PantsuDB, image_path: &Path) -> Result<(SauceQuality, Vec<SauceMatch>), Error> {
-    // opt: check whether file is image
-
-    // file_handler: get file name
-    let image_name = file_handler::hash::calculate_filename(image_path)?;
-
-    // file_handler: check whether file already exists
-    if pantsu_db.get_file(&image_name)?.is_none() {
-        import::import_file("./test_image_lib/", image_path, &image_name)?;
-    }
-
-    let mut sauce_matches = sauce_finder::find_sauce(image_path)?;
-    sauce_matches.sort();
-    let best_match = &sauce_matches[0];
-    return if best_match.similarity >= SIMILARITY_GOOD {
-        let tags = tag_finder::find_tags_gelbooru(&best_match.link)?;
-        // create img in db
-
-        add_tags_to_image(pantsu_db, &image_name, &best_match.link, &tags)?;
-        Ok((SauceQuality::Found, sauce_matches))
-    } else if best_match.similarity >= SIMILARITY_UNSURE {
-        Ok((SauceQuality::Unsure, sauce_matches))
-    } else {
-        Ok((SauceQuality::NotFound, sauce_matches))
-    }
-}
-
-pub fn add_tags_to_image(pantsu_db: &mut PantsuDB, image_name: &str, source: &str, tags: &Vec<PantsuTag>) -> Result<(), Error> {
-    pantsu_db.add_file_and_tags(&ImageFile { filename: String::from(image_name), file_source: Some(String::from(source))}, tags)?;
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use std::io::Cursor;
     use std::path::PathBuf;
-    use crate::{add_image, PantsuDB};
+    use crate::{get_image_sauces, get_sauce_tags, new_image_handle, PantsuDB, SIMILARITY_GOOD, store_image_with_tags_from_sauce};
 
     #[test]
     fn test_add_image() {
@@ -121,7 +90,13 @@ mod tests {
         db_path.push("pantsu_tags.db");
         let mut pdb = PantsuDB::new(&db_path).unwrap();
         let image_path = prepare_image("https://img1.gelbooru.com/images/4f/76/4f76b8d52983af1d28b1bf8d830d684e.png");
-        add_image(&mut pdb, image_path.as_path()).unwrap();
+
+        let image_handle = new_image_handle(&pdb, &image_path).unwrap();
+        let sauces = get_image_sauces(&image_handle).unwrap();
+        let best_match = &sauces.1[0];
+        assert!(best_match.similarity > SIMILARITY_GOOD);
+        let tags = get_sauce_tags(&best_match).unwrap();
+        store_image_with_tags_from_sauce(&mut pdb, &image_handle, &best_match, &tags).unwrap();
     }
 
     fn prepare_image(image_link: &str) -> PathBuf {
