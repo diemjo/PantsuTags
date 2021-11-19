@@ -34,6 +34,9 @@ pub enum Error {
     #[error("Cannot convert tag string '{0}' to PantsuTag")]
     InvalidTagFormat(String),
 
+    #[error("Similar images to '{0:?}' already exist in database")]
+    SimilarImagesExist(Vec<String>),
+
     // file system
     #[error("File not found: {1}")]
     FileNotFound(#[source] std::io::Error, String),
@@ -48,5 +51,5 @@ pub enum Error {
     ImageLoadError(String),
 
     #[error("'{0}' is not a file")]
-    InvalidDatabasePath(String)
+    InvalidDatabasePath(String),
 }
