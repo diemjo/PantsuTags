@@ -56,7 +56,7 @@ pub const INSERT_TAG_INTO_TAG_LIST: &str =
     "INSERT OR IGNORE INTO tags (tag, tag_type) VALUES (?, ?)";
 
 pub const INSERT_FILE_INTO_FILE_LIST: &str =
-    "INSERT INTO files (filename, file_source) VALUES (?, ?)";
+    "INSERT OR IGNORE INTO files (filename, file_source) VALUES (?, ?)";
 
 pub const INSERT_TAG_FOR_FILE: &str =
     "INSERT OR IGNORE INTO file_tags (filename, tag) VALUES (?, ?)";
