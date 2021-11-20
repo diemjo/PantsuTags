@@ -37,7 +37,6 @@ pub fn calculate_filename(path: &Path) -> Result<String, Error>{
 
 pub fn get_similarity_distances(filename: &String, files: Vec<ImageFile>, min_dist: u32) -> Vec<String> {
     let file_hash = extract_hash(filename);
-    println!("image: {}", file_hash.to_string());
     files.into_iter()
         .filter(|file|{
             let p_hash = extract_hash(&file.filename);

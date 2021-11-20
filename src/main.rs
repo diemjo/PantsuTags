@@ -1,4 +1,5 @@
 use std::path::{Path, PathBuf};
+use colored::Colorize;
 use structopt::StructOpt;
 use pantsu_tags::db::PantsuDB;
 use pantsu_tags::Error;
@@ -44,24 +45,24 @@ fn import(no_auto_sources: bool, images: Vec<PathBuf>) -> Result<(), Error> {
         match import_one_image(&mut pdb, &image, no_auto_sources) {
             Ok(_) => {
                 import_stats.success += 1;
-                println!("Successfully imported image - {}", image_name);
+                println!("{} - {}", "Successfully imported image".green(), image_name);
             }
             Err(Error::ImageAlreadyExists(_)) => {
                 import_stats.already_exists += 1;
-                println!("Image already exists - {}", image_name);
+                println!("{} - {}", "Image already exists       ", image_name);
             },
             Err(Error::SimilarImagesExist(img, similar_images)) => {
                 import_stats.similar_exists += 1;
-                println!("Similar images exist - {}", image_name);
+                println!("{} - {}", "Similar images exist       ".yellow(), image_name);
             },
             Err(Error::ImageLoadError(_)) | Err(Error::FileNotFound(_, _)) => {
                 import_stats.could_not_open += 1;
-                println!("Failed to open image - {}", image_name);
+                println!("{} - {}", "Failed to open image       ", image_name);
             },
             error => return error,
         }
     }
-    println!("\n\nDone");
+    println!("\n\n{}", "Done".green().blink());
     println!("Successfully imported: {}", import_stats.success);
     println!("Already exists:        {}", import_stats.already_exists);
     println!("Similar image exists:  {}", import_stats.similar_exists);
