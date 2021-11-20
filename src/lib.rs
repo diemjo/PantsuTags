@@ -4,7 +4,7 @@ use crate::common::image_handle::ImageHandle;
 use crate::common::image_file::ImageFile;
 pub use crate::common::pantsu_tag::PantsuTag;
 use crate::db::PantsuDB;
-use crate::error::Error;
+pub use crate::error::Error;
 use crate::file_handler::import;
 use crate::sauce::{sauce_finder, SauceMatch, tag_finder};
 

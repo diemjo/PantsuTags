@@ -7,10 +7,6 @@ pub fn get_path(path: &Path) -> String {
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    // lib errors
-    #[error("Failed to add image {0}: Image already exists")]
-    ImageAlreadyExists(String),
-
     // sauce errors
     #[error("Failed to send image source request: {0}")]
     FailedRequest(#[from] reqwest::Error),
@@ -36,6 +32,9 @@ pub enum Error {
 
     #[error("Similar images to '{0}' already exist in database: '{1:?}'")]
     SimilarImagesExist(String, Vec<String>),
+
+    #[error("Failed to add image {0}: Image already exists")]
+    ImageAlreadyExists(String),
 
     // file system
     #[error("File not found: {1}")]
