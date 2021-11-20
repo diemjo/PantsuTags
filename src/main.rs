@@ -134,18 +134,6 @@ fn get(included_tags: Vec<String>, excluded_tags: Vec<String>, temp_dir: Option<
     }
 }
 
-#[derive(Debug, thiserror::Error)]
-pub enum AppError {
-    #[error("Couldn't find relevant sauces")]
-    NoRelevantSauces,
-
-    #[error("Not sure whether sauce is correct or not")]
-    SauceUnsure(Vec<SauceMatch>),
-
-    #[error(transparent)]
-    LibError(#[from] Error),
-}
-
 fn link_files_to_tmp_dir(files: &Vec<ImageFile>, lib_dir: &Path, tmp_path: &PathBuf) -> Result<(), AppError> {
     let paths = get_file_paths(files, lib_dir)?;
     std::fs::create_dir_all(tmp_path).or_else(|err| Err(Error::DirectoryCreateError(err, String::from(tmp_path.to_str().unwrap_or_default()))))?;
@@ -180,4 +168,18 @@ fn get_file_paths(files: &Vec<ImageFile>, lib_dir: &Path) -> Result<Vec<PathBuf>
             lib_dir_abs.join(&f.filename)
         })
         .collect())
+}
+
+type AppResult<T> = std::result::Result<T, AppError>;
+
+#[derive(Debug, thiserror::Error)]
+pub enum AppError {
+    #[error("Couldn't find relevant sauces")]
+    NoRelevantSauces,
+
+    #[error("Not sure whether sauce is correct or not")]
+    SauceUnsure(Vec<SauceMatch>),
+
+    #[error(transparent)]
+    LibError(#[from] Error),
 }

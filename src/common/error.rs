@@ -5,6 +5,8 @@ pub fn get_path(path: &Path) -> String {
     String::from(path.to_str().unwrap_or("cannot display path"))
 }
 
+pub type Result<T> = std::result::Result<T, Error>;
+
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     // sauce errors
