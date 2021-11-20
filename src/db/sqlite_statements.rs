@@ -32,11 +32,46 @@ pub const SELECT_FILE: &str =
 pub const SELECT_ALL_FILES: &str =
     "SELECT filename, file_source FROM files";
 
-pub const SELECT_FILES_FOR_TAGS_PLACEHOLDER: &str = "TAG_LIST";
-pub const SELECT_FILES_FOR_TAGS: &str =
-    "SELECT files.filename, files.file_source FROM files
-     JOIN file_tags ON files.filename = file_tags.filename
-     WHERE file_tags.tag IN (TAG_LIST)";
+pub const SELECT_FILES_FOR_TAGS_TAG_COUNT: &str= "TAG_COUNT";
+pub const SELECT_FILES_FOR_INCLUDING_TAGS_PLACEHOLDER: &str = "INCLUDE_TAG_LIST";
+pub const SELECT_FILES_FOR_INCLUDING_TAGS: &str =
+    "SELECT DISTINCT filename, file_source
+    FROM files
+    WHERE filename IN (
+        SELECT filename FROM file_tags
+        WHERE tag IN (INCLUDE_TAG_LIST)
+        GROUP BY filename
+        HAVING COUNT(DISTINCT tag)=TAG_COUNT
+    )";
+
+pub const SELECT_FILES_FOR_EXCLUDING_TAGS_PLACEHOLDER: &str = "EXCLUDE_TAG_LIST";
+pub const SELECT_FILES_FOR_EXCLUDING_TAGS: &str =
+    "SELECT DISTINCT filename, file_source
+    FROM files
+    WHERE filename NOT IN (
+        SELECT filename
+        FROM file_tags
+        WHERE tag IN (EXCLUDE_TAG_LIST)
+        GROUP BY filename
+        HAVING COUNT(DISTINCT tag)>0
+    )";
+
+pub const SELECT_FILES_FOR_INCLUDING_AND_EXCLUDING_TAGS: &str =
+    "SELECT DISTINCT filename, file_source
+    FROM files
+    WHERE filename IN (
+        SELECT filename FROM file_tags
+        WHERE tag IN (INCLUDE_TAG_LIST)
+        GROUP BY filename
+        HAVING COUNT(DISTINCT tag)=TAG_COUNT
+    )
+    AND filename NOT IN (
+        SELECT filename
+        FROM file_tags
+        WHERE tag IN (EXCLUDE_TAG_LIST)
+        GROUP BY filename
+        HAVING COUNT(DISTINCT tag)>0
+    )";
 
 pub const SELECT_TAGS_FOR_FILE: &str =
     "SELECT tags.tag, tags.tag_type FROM file_tags

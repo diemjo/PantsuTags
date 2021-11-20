@@ -84,11 +84,18 @@ impl PantsuDB {
         db_calls::get_all_files(&self.conn)
     }
 
-    pub fn get_files_with_tags(&self, tags: &Vec<String>) -> Result<Vec<ImageFile>, Error> {
-        if tags.len() == 0 {
+    pub fn get_files_with_tags(&self, included_tags: &Vec<String>) -> Result<Vec<ImageFile>, Error> {
+        if included_tags.len() == 0 {
             return self.get_all_files();
         }
-        db_calls::get_files_with_tags(&self.conn, tags)
+        db_calls::get_files_with_tags(&self.conn, included_tags, &Vec::<String>::new())
+    }
+
+    pub fn get_files_with_tags_but(&self, included_tags: &Vec<String>, excluded_tags: &Vec<String>) -> Result<Vec<ImageFile>, Error> {
+        if included_tags.len() == 0 && excluded_tags.len() == 0 {
+            return self.get_all_files();
+        }
+        db_calls::get_files_with_tags(&self.conn, included_tags, excluded_tags)
     }
 
     // file->tag
@@ -281,9 +288,13 @@ mod tests {
         pdb.add_file_and_tags(&get_test_image2(), &tags_to_add).unwrap();
         pdb.add_tags(&get_test_image2(), &vec!["general:Huhu".parse().unwrap()]).unwrap();
         let files = pdb.get_files_with_tags(&vec![String::from("Haha")]).unwrap();
-        assert_eq!(files.len(), 2);
+        assert_eq!(files, vec![get_test_image(), get_test_image2()]);
         let files = pdb.get_files_with_tags(&vec![String::from("Huhu")]).unwrap();
-        assert_eq!(files.len(), 1);
+        assert_eq!(files, vec![get_test_image2()]);
+        let files = pdb.get_files_with_tags_but(&Vec::new(), &vec![String::from("Huhu")]).unwrap();
+        assert_eq!(files, vec![get_test_image()]);
+        let files = pdb.get_files_with_tags_but(&vec![String::from("Haha")], &vec![String::from("Huhu")]).unwrap();
+        assert_eq!(files, vec![get_test_image()]);
     }
 
     #[test]

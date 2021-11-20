@@ -94,13 +94,36 @@ pub fn get_all_files(connection: &Connection) -> Result<Vec<ImageFile>, Error> {
     query_helpers::query_rows_as_files(&mut stmt, [])
 }
 
-pub fn get_files_with_tags(connection: &Connection, tags: &Vec<String>) -> Result<Vec<ImageFile>, Error> {
-    let formatted_stmt = sqlite_statements::SELECT_FILES_FOR_TAGS
-        .replace(sqlite_statements::SELECT_FILES_FOR_TAGS_PLACEHOLDER, &query_helpers::repeat_vars(tags.len()));
+pub fn get_files_with_tags(connection: &Connection, included_tags: &Vec<String>, excluded_tags: &Vec<String>) -> Result<Vec<ImageFile>, Error> {
+    let formatted_stmt =
+        if included_tags.len()!=0 && excluded_tags.len()!=0 {
+            sqlite_statements::SELECT_FILES_FOR_INCLUDING_AND_EXCLUDING_TAGS
+                .replace(sqlite_statements::SELECT_FILES_FOR_INCLUDING_TAGS_PLACEHOLDER, &query_helpers::repeat_vars(included_tags.len()))
+                .replace(sqlite_statements::SELECT_FILES_FOR_EXCLUDING_TAGS_PLACEHOLDER, &query_helpers::repeat_vars(excluded_tags.len()))
+                .replace(sqlite_statements::SELECT_FILES_FOR_TAGS_TAG_COUNT, &included_tags.len().to_string())
+        } else if included_tags.len()==0 {
+            sqlite_statements::SELECT_FILES_FOR_EXCLUDING_TAGS
+                .replace(sqlite_statements::SELECT_FILES_FOR_EXCLUDING_TAGS_PLACEHOLDER, &query_helpers::repeat_vars(excluded_tags.len()))
+        } else {
+            sqlite_statements::SELECT_FILES_FOR_INCLUDING_TAGS
+                .replace(sqlite_statements::SELECT_FILES_FOR_INCLUDING_TAGS_PLACEHOLDER, &query_helpers::repeat_vars(included_tags.len()))
+                .replace(sqlite_statements::SELECT_FILES_FOR_TAGS_TAG_COUNT, &included_tags.len().to_string())
+        };
     let mut stmt = connection.prepare(&formatted_stmt)?;
 
-    let params = rusqlite::params_from_iter(tags.iter());
-    query_helpers::query_rows_as_files(&mut stmt, params)
+    if included_tags.len()!=0 && excluded_tags.len()!=0 {
+        let mut vec = Vec::<&String>::new();
+        vec.extend(included_tags);
+        vec.extend(excluded_tags);
+        let params = rusqlite::params_from_iter(vec.iter());
+        query_helpers::query_rows_as_files(&mut stmt, params)
+    } else if included_tags.len()==0 {
+        let params = rusqlite::params_from_iter(excluded_tags.iter());
+        query_helpers::query_rows_as_files(&mut stmt, params)
+    } else {
+        let params = rusqlite::params_from_iter(included_tags.iter());
+        query_helpers::query_rows_as_files(&mut stmt, params)
+    }
 }
 
 pub fn get_tags_for_file(connection: &Connection, file: &ImageFile) -> Result<Vec<PantsuTag>, Error> {
