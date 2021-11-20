@@ -1,8 +1,10 @@
 use std::path::{Path, PathBuf};
 use structopt::StructOpt;
 use pantsu_tags::db::PantsuDB;
-use pantsu_tags::{Error, SauceQuality};
+use pantsu_tags::Error;
 use pantsu_tags::PantsuTag;
+
+const GOOD_SIMILARITY_THRESHOLD: i32 = 90;
 
 fn main() -> Result<(), Error> {
     let args = Args::from_args();
@@ -75,13 +77,20 @@ fn import_one_image(pdb: &mut PantsuDB, image: &PathBuf, no_auto_sources: bool) 
     }
     else {
         let sauces = pantsu_tags::get_image_sauces(&image_handle)?;
-        if let SauceQuality::Found = sauces.0 {
-            let tags = pantsu_tags::get_sauce_tags(&sauces.1[0])?;
-            pantsu_tags::store_image_with_tags_from_sauce(pdb, &image_handle, &sauces.1[0], &tags)?;
-        }
-        else {
-            panic!("not yet implemented");
-            // todo
+        match sauces.first() {
+            Some(sauce) => {
+                if sauce.similarity > GOOD_SIMILARITY_THRESHOLD {
+                    let tags = pantsu_tags::get_sauce_tags(sauce)?;
+                    pantsu_tags::store_image_with_tags_from_sauce(pdb, &image_handle, sauce, &tags)?;
+                }
+                else {
+                    panic!("unsure if sauces are relevant. not yet implemented");
+                    // todo
+                }
+            }
+            None => {
+                panic!("No relevant sauces. not yet implemented");
+            }
         }
     }
     Ok(())
