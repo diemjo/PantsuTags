@@ -54,7 +54,13 @@ fn import(no_auto_sources: bool, images: Vec<PathBuf>) -> Result<(), AppError> {
     let mut pdb = PantsuDB::new(pdb_path)?;
     for image in images {
         let image_name = image.to_str().unwrap_or("(can't display image name)");
-        match import_one_image(&mut pdb, &image, no_auto_sources) {
+        let res = if no_auto_sources {
+            import_one_image(&mut pdb, &image)
+        }
+        else {
+            import_one_image_auto_source(&mut pdb, &image)
+        };
+        match res {
             Ok(_) => {
                 import_stats.success += 1;
                 println!("{} - {}", "Successfully imported image".green(), image_name);
@@ -96,31 +102,31 @@ fn import(no_auto_sources: bool, images: Vec<PathBuf>) -> Result<(), AppError> {
     Ok(())
 }
 
-fn import_one_image(pdb: &mut PantsuDB, image: &PathBuf, no_auto_sources: bool) -> Result<(), AppError> {
+fn import_one_image_auto_source(pdb: &mut PantsuDB, image: &PathBuf) -> Result<(), AppError> {
     let image_handle = pantsu_tags::new_image_handle(pdb, &image, true)?;
-    if no_auto_sources {
-        let no_tags: Vec<PantsuTag> = Vec::new();
-        pantsu_tags::store_image_with_tags(pdb, &image_handle, &no_tags)?;
-    }
-    else {
-        let sauces = pantsu_tags::get_image_sauces(&image_handle)?;
-        let relevant_sauces: Vec<SauceMatch> = sauces.into_iter().filter(|s| s.similarity > RELEVANT_SIMILARITY_THESHOLD).collect();
-        match relevant_sauces.first() {
-            Some(sauce) => {
-                if sauce.similarity > FOUND_SIMILARITY_THRESHOLD {
-                    let tags = pantsu_tags::get_sauce_tags(sauce)?;
-                    pantsu_tags::store_image_with_tags_from_sauce(pdb, &image_handle, sauce, &tags)?;
-                }
-                else {
-                    return Err(AppError::SauceUnsure(relevant_sauces));
-                }
+    let sauces = pantsu_tags::get_image_sauces(&image_handle)?;
+    let relevant_sauces: Vec<SauceMatch> = sauces.into_iter().filter(|s| s.similarity > RELEVANT_SIMILARITY_THESHOLD).collect();
+    match relevant_sauces.first() {
+        Some(sauce) => {
+            if sauce.similarity > FOUND_SIMILARITY_THRESHOLD {
+                let tags = pantsu_tags::get_sauce_tags(sauce)?;
+                pantsu_tags::store_image_with_tags_from_sauce(pdb, &image_handle, sauce, &tags)?;
             }
-            None => {
-                return Err(AppError::NoRelevantSauces);
+            else {
+                return Err(AppError::SauceUnsure(relevant_sauces));
             }
+        }
+        None => {
+            return Err(AppError::NoRelevantSauces);
         }
     }
     Ok(())
+}
+
+fn import_one_image(pdb: &mut PantsuDB, image: &PathBuf) -> Result<(), AppError> {
+    let image_handle = pantsu_tags::new_image_handle(pdb, &image, true)?;
+    let no_tags: Vec<PantsuTag> = Vec::new();
+    pantsu_tags::store_image_with_tags(pdb, &image_handle, &no_tags).map_err(|e| AppError::LibError(e))
 }
 
 fn get(included_tags: Vec<String>, excluded_tags: Vec<String>, temp_dir: Option<PathBuf>) -> Result<(), AppError> {
