@@ -3,7 +3,7 @@ use std::cmp::Ordering;
 pub mod tag_finder;
 pub mod sauce_finder;
 
-#[derive(Eq)]
+#[derive(Debug, Eq)]
 pub struct SauceMatch {
     pub link: String,
     pub similarity: i32,

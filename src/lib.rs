@@ -13,9 +13,6 @@ mod common;
 pub mod db;
 pub mod file_handler;
 
-// sauce matches with a lower similarity won't be returned to the client
-const SIMILARITY_THESHOLD: i32 = 45;
-
 pub fn new_image_handle(pantsu_db: &PantsuDB, image_path: &Path, error_on_similar: bool) -> Result<ImageHandle, Error> {
     let image_name = file_handler::hash::calculate_filename(image_path)?;
 
@@ -39,8 +36,7 @@ pub fn get_image_sauces(image: &ImageHandle) -> Result<Vec<SauceMatch>, Error> {
     let mut sauce_matches = sauce_finder::find_sauce(&image_path)?;
     sauce_matches.sort();
     sauce_matches.reverse();
-    let relevant_matches = sauce_matches.into_iter().filter(|s| s.similarity > SIMILARITY_THESHOLD).collect();
-    Ok(relevant_matches)
+    Ok(sauce_matches)
 }
 
 pub fn get_sauce_tags(sauce: &SauceMatch) -> Result<Vec<PantsuTag>, Error> {
