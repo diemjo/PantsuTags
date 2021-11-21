@@ -1,16 +1,18 @@
 use std::path::Path;
+use reqwest::blocking;
 use reqwest::blocking::{Client, multipart};
 use select::document::Document;
 use select::node::Node;
 use select::predicate::{Attr, Name};
 use crate::common::error;
 use crate::common::error::Error;
+use crate::common::error::Result;
 use super::SauceMatch;
 
 const IQDB_ADDRESS: &str = "https://gelbooru.iqdb.org/";
 
 // image path has to point to an image, otherwise returns an Error::HtmlParseError
-pub fn find_sauce(image_path: &Path) -> Result<Vec<SauceMatch>, Error> {
+pub fn find_sauce(image_path: &Path) -> Result<Vec<SauceMatch>> {
     let client = Client::new();
     let form = multipart::Form::new()
         .file("file", image_path).or_else(
@@ -27,7 +29,19 @@ pub fn find_sauce(image_path: &Path) -> Result<Vec<SauceMatch>, Error> {
     extract_sauce(&html)
 }
 
-fn extract_sauce(html: &Document) -> Result<Vec<SauceMatch>, Error> {
+pub fn get_thumbnail_link(sauce: &SauceMatch) -> Result<String> {
+    let response = blocking::get(&sauce.link)?;
+    if !response.status().is_success() {
+        return Err(Error::BadResponseStatus(response.status()));
+    }
+    let html = Document::from(response.text()?.as_str());
+    let image = html.find(Attr("id", "image")).next().ok_or(Error::HtmlParseError)?; // thumbnail html element should always exist
+    let link = image.attr("src").ok_or(Error::HtmlParseError)?;
+    Ok(link.to_owned())
+}
+
+
+fn extract_sauce(html: &Document) -> Result<Vec<SauceMatch>> {
     let mut pages = html.find(Attr("id", "pages"));
     let pages = pages.next().ok_or(Error::HtmlParseError)?; // html element "pages" should always exist, even if there are no relevant matches. Maybe file wasn't an image?
     let mut res: Vec<SauceMatch> = Vec::new();

@@ -4,6 +4,7 @@ mod tag_finder;
 mod sauce_finder;
 
 pub use sauce_finder::find_sauce;
+pub use sauce_finder::get_thumbnail_link;
 pub use tag_finder::find_tags_gelbooru;
 
 
