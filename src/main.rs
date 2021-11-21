@@ -3,7 +3,7 @@ use colored::Colorize;
 use structopt::StructOpt;
 use pantsu_tags::db::PantsuDB;
 use pantsu_tags::{Error, ImageFile, PantsuTag};
-use pantsu_tags::sauce::SauceMatch;
+use pantsu_tags::SauceMatch;
 use crate::cli::Args;
 
 mod cli;

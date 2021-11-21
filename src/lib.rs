@@ -1,15 +1,16 @@
 use std::path::{Path, PathBuf};
 use crate::common::error;
 use crate::common::image_handle::ImageHandle;
+use crate::db::PantsuDB;
+use crate::file_handler::import;
+
+pub use crate::common::error::Error;
+pub use crate::common::error::Result;
 pub use crate::common::image_file::ImageFile;
 pub use crate::common::pantsu_tag::PantsuTag;
-use crate::db::PantsuDB;
-pub use crate::error::Error;
-pub use crate::error::Result;
-use crate::file_handler::import;
-use crate::sauce::{sauce_finder, SauceMatch, tag_finder};
+pub use crate::sauce::SauceMatch;
 
-pub mod sauce;
+mod sauce;
 mod common;
 pub mod db;
 pub mod file_handler;
@@ -34,14 +35,14 @@ pub fn new_image_handle(pantsu_db: &PantsuDB, image_path: &Path, error_on_simila
 
 pub fn get_image_sauces(image: &ImageHandle) -> Result<Vec<SauceMatch>> {
     let image_path = PathBuf::from(format!("./test_image_lib/{}", image.get_filename()));
-    let mut sauce_matches = sauce_finder::find_sauce(&image_path)?;
+    let mut sauce_matches = sauce::find_sauce(&image_path)?;
     sauce_matches.sort();
     sauce_matches.reverse();
     Ok(sauce_matches)
 }
 
 pub fn get_sauce_tags(sauce: &SauceMatch) -> Result<Vec<PantsuTag>> {
-    tag_finder::find_tags_gelbooru(&sauce.link)
+    sauce::find_tags_gelbooru(&sauce.link)
 }
 
 pub fn store_image_with_tags_from_sauce(pantsu_db: &mut PantsuDB, image: &ImageHandle, sauce: &SauceMatch, tags: &Vec<PantsuTag>) -> Result<()> {
