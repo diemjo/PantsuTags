@@ -1,13 +1,12 @@
 use std::path::{Path, PathBuf};
 use crate::common::error;
-use crate::common::image_handle::ImageHandle;
 use crate::db::PantsuDB;
 use crate::file_handler::import;
 
 pub use crate::common::error::Error;
 pub use crate::common::error::Result;
-pub use crate::common::image_file::ImageFile;
-pub use crate::common::image_file::Sauce;
+pub use crate::common::image_handle::ImageHandle;
+pub use crate::common::image_handle::Sauce;
 pub use crate::common::pantsu_tag::{PantsuTag, PantsuTagType};
 pub use crate::sauce::SauceMatch;
 pub use crate::sauce::get_thumbnail_link;
@@ -31,8 +30,7 @@ pub fn new_image_handle(pantsu_db: &PantsuDB, image_path: &Path, error_on_simila
         }
     }
 
-    import::import_file("./test_image_lib/", image_path, &image_name)?;
-    Ok(ImageHandle::new(String::from(image_name)))
+    Ok(import::import_file("./test_image_lib/", image_path, &image_name)?)
 }
 
 pub fn get_image_sauces(image: &ImageHandle) -> Result<Vec<SauceMatch>> {
@@ -49,10 +47,10 @@ pub fn get_sauce_tags(sauce: &SauceMatch) -> Result<Vec<PantsuTag>> {
 
 pub fn store_image_with_tags(pantsu_db: &mut PantsuDB, image: &ImageHandle, sauce: Sauce, tags: &Vec<PantsuTag>) -> Result<()> {
     pantsu_db.add_file_and_tags(
-        &ImageFile {
-            filename: String::from(image.get_filename()),
-            file_source: sauce
-        },
+        &ImageHandle::new(
+            String::from(image.get_filename()),
+            sauce
+    ),
         tags
     )
 }
@@ -66,7 +64,7 @@ fn get_similar_images(pantsu_db: &PantsuDB, file_name: &String, min_dist: u32) -
 mod tests {
     use std::io::Cursor;
     use std::path::PathBuf;
-    use crate::{ImageFile, PantsuDB, PantsuTag, Sauce};
+    use crate::{ImageHandle, PantsuDB, PantsuTag, Sauce};
     use crate::file_handler::hash;
     use serial_test::serial;
 
@@ -100,11 +98,11 @@ mod tests {
         let mut pdb = PantsuDB::new(&db_path).unwrap();
         pdb.clear().unwrap();
         pdb.add_file_and_tags(
-            &ImageFile { filename: image_name, file_source: Sauce::NotChecked },
+            &ImageHandle::new(image_name, Sauce::NotChecked),
             &vec![PantsuTag{tag_name: String::from("Hehe"), tag_type: "general".parse().unwrap()}]
         ).unwrap();
         pdb.add_file_and_tags(
-            &ImageFile { filename: not_similar_image_name, file_source: Sauce::NotChecked },
+            &ImageHandle::new(not_similar_image_name, Sauce::NotChecked),
             &vec![PantsuTag{tag_name: String::from("Hehe"), tag_type: "general".parse().unwrap()}]
         ).unwrap();
         let similar_images = crate::get_similar_images(&pdb, &similar_image_name, 10).unwrap();

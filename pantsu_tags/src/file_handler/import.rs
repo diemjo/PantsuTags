@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use crate::common::error;
 
 use crate::common::error::Error;
-use crate::ImageHandle;
+use crate::{ImageHandle, Sauce};
 
 pub fn import_file(lib: &str, file: &Path, new_filename: &str) -> Result<ImageHandle, Error> {
     let lib_path = PathBuf::from(lib);
@@ -20,5 +20,5 @@ pub fn import_file(lib: &str, file: &Path, new_filename: &str) -> Result<ImageHa
             Err(Error::HardLinkError(err, error::get_path(file)))
         }
     })?;
-    Ok(ImageHandle::new(String::from(new_filename)))
+    Ok(ImageHandle::new(String::from(new_filename), Sauce::NotChecked))
 }

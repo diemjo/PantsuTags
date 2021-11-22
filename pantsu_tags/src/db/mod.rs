@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 use rusqlite::{Connection};
 use crate::common::error;
 use crate::common::error::Error;
-use crate::common::image_file::ImageFile;
+use crate::common::image_handle::ImageHandle;
 use crate::common::pantsu_tag::{PantsuTag, PantsuTagType};
 use crate::file_handler;
 
@@ -47,7 +47,7 @@ impl PantsuDB {
     }
 
     // file
-    pub fn add_file(&mut self, file: &ImageFile) -> Result<(), Error> {
+    pub fn add_file(&mut self, file: &ImageHandle) -> Result<(), Error> {
         let transaction = self.conn.transaction()?;
 
         db_calls::add_file_to_file_list(&transaction, file)?;
@@ -56,7 +56,7 @@ impl PantsuDB {
         Ok(())
     }
 
-    pub fn remove_file(&mut self, file: &ImageFile) -> Result<(), Error> {
+    pub fn remove_file(&mut self, file: &ImageHandle) -> Result<(), Error> {
         let transaction = self.conn.transaction()?;
 
         db_calls::remove_all_tags_from_file(&transaction, file)?;
@@ -67,7 +67,7 @@ impl PantsuDB {
         Ok(())
     }
 
-    pub fn update_file_source(&mut self, file: &ImageFile) -> Result<(), Error> {
+    pub fn update_file_source(&mut self, file: &ImageHandle) -> Result<(), Error> {
         let transaction = self.conn.transaction()?;
 
         db_calls::update_file_source(&transaction, file)?;
@@ -76,22 +76,22 @@ impl PantsuDB {
         Ok(())
     }
 
-    pub fn get_file(&self, filename: &str) -> Result<Option<ImageFile>, Error> {
+    pub fn get_file(&self, filename: &str) -> Result<Option<ImageHandle>, Error> {
         db_calls::get_file(&self.conn, filename)
     }
 
-    pub fn get_all_files(&self) -> Result<Vec<ImageFile>, Error> {
+    pub fn get_all_files(&self) -> Result<Vec<ImageHandle>, Error> {
         db_calls::get_all_files(&self.conn)
     }
 
-    pub fn get_files_with_tags(&self, included_tags: &Vec<String>) -> Result<Vec<ImageFile>, Error> {
+    pub fn get_files_with_tags(&self, included_tags: &Vec<String>) -> Result<Vec<ImageHandle>, Error> {
         if included_tags.len() == 0 {
             return self.get_all_files();
         }
         db_calls::get_files_with_tags(&self.conn, included_tags, &Vec::<String>::new())
     }
 
-    pub fn get_files_with_tags_but(&self, included_tags: &Vec<String>, excluded_tags: &Vec<String>) -> Result<Vec<ImageFile>, Error> {
+    pub fn get_files_with_tags_but(&self, included_tags: &Vec<String>, excluded_tags: &Vec<String>) -> Result<Vec<ImageHandle>, Error> {
         if included_tags.len() == 0 && excluded_tags.len() == 0 {
             return self.get_all_files();
         }
@@ -99,7 +99,7 @@ impl PantsuDB {
     }
 
     // file->tag
-    pub fn add_tags(&mut self, file: &ImageFile, tags: &Vec<PantsuTag>) -> Result<(), Error> {
+    pub fn add_tags(&mut self, file: &ImageHandle, tags: &Vec<PantsuTag>) -> Result<(), Error> {
         let transaction = self.conn.transaction()?;
 
         db_calls::add_tags_to_tag_list(&transaction, tags)?;
@@ -109,7 +109,7 @@ impl PantsuDB {
         Ok(())
     }
 
-    pub fn add_file_and_tags(&mut self, file: &ImageFile, tags: &Vec<PantsuTag>) -> Result<(), Error> {
+    pub fn add_file_and_tags(&mut self, file: &ImageHandle, tags: &Vec<PantsuTag>) -> Result<(), Error> {
         let transaction = self.conn.transaction()?;
 
         db_calls::add_file_to_file_list(&transaction, file)?;
@@ -120,7 +120,7 @@ impl PantsuDB {
         Ok(())
     }
 
-    pub fn remove_tags(&mut self, file: &ImageFile, tags: &Vec<PantsuTag>) -> Result<(), Error> {
+    pub fn remove_tags(&mut self, file: &ImageHandle, tags: &Vec<PantsuTag>) -> Result<(), Error> {
         let transaction = self.conn.transaction()?;
 
         db_calls::remove_tags_from_file(&transaction, file, tags)?;
@@ -130,7 +130,7 @@ impl PantsuDB {
         Ok(())
     }
 
-    pub fn get_tags_for_file(&self, file: &ImageFile) -> Result<Vec<PantsuTag>, Error> {
+    pub fn get_tags_for_file(&self, file: &ImageHandle) -> Result<Vec<PantsuTag>, Error> {
         db_calls::get_tags_for_file(&self.conn, file)
     }
 
@@ -152,7 +152,7 @@ mod tests {
     use std::path::Path;
     use crate::common::pantsu_tag::{PantsuTag, PantsuTagType};
     use crate::common::error::Error;
-    use crate::common::image_file::ImageFile;
+    use crate::common::image_handle::ImageHandle;
     use crate::db::PantsuDB;
 
     use serial_test::serial;
@@ -176,8 +176,8 @@ mod tests {
         pdb.clear().unwrap();
         let img = &get_test_image();
         pdb.add_file(img).unwrap();
-        pdb.update_file_source(&ImageFile{ filename: img.filename.clone(), file_source: Sauce::Match(String::from("https://fake.url")) }).unwrap();
-        assert_eq!(pdb.get_file(&img.filename).unwrap().unwrap().file_source, Sauce::Match(String::from("https://fake.url")));
+        pdb.update_file_source(&ImageHandle::new(String::from(img.get_filename()), Sauce::Match(String::from("https://fake.url")))).unwrap();
+        assert_eq!(pdb.get_file(img.get_filename()).unwrap().unwrap().get_sauce(), &Sauce::Match(String::from("https://fake.url")));
     }
 
     #[test]
@@ -356,11 +356,11 @@ mod tests {
         }
     }
 
-    fn get_test_image() -> ImageFile {
-        ImageFile { filename: String::from("test_image_1db8ab6c94e95f36a9dd5bde347f6dd1.png"), file_source: Sauce::NotChecked }
+    fn get_test_image() -> ImageHandle {
+        ImageHandle::new(String::from("test_image_1db8ab6c94e95f36a9dd5bde347f6dd1.png"), Sauce::NotChecked)
     }
 
-    fn get_test_image2() -> ImageFile {
-        ImageFile { filename: String::from("test_image_4f76b8d52983af1d28b1bf8d830d684e.png"), file_source: Match(String::from("http://real.url")) }
+    fn get_test_image2() -> ImageHandle {
+        ImageHandle::new(String::from("test_image_4f76b8d52983af1d28b1bf8d830d684e.png"), Match(String::from("http://real.url")) )
     }
 }

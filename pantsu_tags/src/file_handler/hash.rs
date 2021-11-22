@@ -5,7 +5,7 @@ use image::{DynamicImage, GenericImageView, ImageError};
 use lz_fnv::{Fnv1a, FnvHasher};
 use crate::common::error;
 use crate::common::error::Error;
-use crate::ImageFile;
+use crate::ImageHandle;
 
 struct AdapterImage {
     pub image: DynamicImage,
@@ -35,21 +35,21 @@ pub fn calculate_filename(path: &Path) -> Result<String, Error>{
     Ok(format!("{}-{}.{}", fnv1a_hash, perceptual_hash, file_extension))
 }
 
-pub fn get_similarity_distances(filename: &String, files: Vec<ImageFile>, min_dist: u32) -> Vec<String> {
+pub fn get_similarity_distances(filename: &String, files: Vec<ImageHandle>, min_dist: u32) -> Vec<String> {
     let file_hash = extract_hash(filename);
     files.into_iter()
         .filter(|file|{
-            let p_hash = extract_hash(&file.filename);
+            let p_hash = extract_hash(file.get_filename());
             let dist = file_hash.distance(&p_hash);
             dist < min_dist
         }).map(|file|{
-            file.filename
+            String::from(file.get_filename())
         }).filter(|file|{
             file!=filename
         }).collect::<Vec<String>>()
 }
 
-fn extract_hash(filename: &String) -> Blockhash144 {
+fn extract_hash(filename: &str) -> Blockhash144 {
     // 0-15=fnv_hash, 16='-', 17-52=p_hash, 53='.', 54+=extension
     let p_hash = &filename[17..53];
     Blockhash144::from_str(p_hash).unwrap()
