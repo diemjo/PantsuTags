@@ -12,7 +12,7 @@ pub struct PantsuTag {
 
 impl fmt::Display for PantsuTag {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{}:{}", self.tag_name, self.tag_type)
+        write!(f, "{}:{}", self.tag_type, self.tag_name)
     }
 }
 

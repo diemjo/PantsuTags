@@ -26,10 +26,10 @@ pub enum Error {
     #[error("Failed underlying SQLite call: {0}")]
     SQLError(#[from] rusqlite::Error),
 
-    #[error("Cannot convert invalid tag type '{0}' to enum variant of PantsuTagType")]
+    #[error("Cannot convert invalid tag type '{0}' to enum variant of PantsuTagType, valid types:\nartist, source, character, general, rating, custom")]
     InvalidTagType(String),
 
-    #[error("Cannot convert tag string '{0}' to PantsuTag")]
+    #[error("Cannot convert tag string '{0}' to PantsuTag, valid format: <type>:<name>")]
     InvalidTagFormat(String),
 
     #[error("Similar images to '{0}' already exist in database: '{1:?}'")]
@@ -37,6 +37,9 @@ pub enum Error {
 
     #[error("Failed to add image {0}: Image already exists")]
     ImageAlreadyExists(String),
+
+    #[error("Image not found in database: {0}")]
+    ImageNotFoundInDB(String),
 
     // file system
     #[error("File not found: {1}")]

@@ -8,7 +8,7 @@ pub use crate::common::error::Error;
 pub use crate::common::error::Result;
 pub use crate::common::image_file::ImageFile;
 pub use crate::common::image_file::Sauce;
-pub use crate::common::pantsu_tag::PantsuTag;
+pub use crate::common::pantsu_tag::{PantsuTag, PantsuTagType};
 pub use crate::sauce::SauceMatch;
 pub use crate::sauce::get_thumbnail_link;
 

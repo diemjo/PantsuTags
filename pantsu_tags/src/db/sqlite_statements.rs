@@ -30,7 +30,8 @@ pub const SELECT_FILE: &str =
     WHERE filename = (?)";
 
 pub const SELECT_ALL_FILES: &str =
-    "SELECT filename, file_source FROM files";
+    "SELECT filename, file_source FROM files
+    ORDER BY filename ASC";
 
 pub const SELECT_FILES_FOR_TAGS_TAG_COUNT: &str= "TAG_COUNT";
 pub const SELECT_FILES_FOR_INCLUDING_TAGS_PLACEHOLDER: &str = "INCLUDE_TAG_LIST";
@@ -42,7 +43,8 @@ pub const SELECT_FILES_FOR_INCLUDING_TAGS: &str =
         WHERE tag IN (INCLUDE_TAG_LIST)
         GROUP BY filename
         HAVING COUNT(DISTINCT tag)=TAG_COUNT
-    )";
+    )
+    ORDER BY filename ASC";
 
 pub const SELECT_FILES_FOR_EXCLUDING_TAGS_PLACEHOLDER: &str = "EXCLUDE_TAG_LIST";
 pub const SELECT_FILES_FOR_EXCLUDING_TAGS: &str =
@@ -54,7 +56,8 @@ pub const SELECT_FILES_FOR_EXCLUDING_TAGS: &str =
         WHERE tag IN (EXCLUDE_TAG_LIST)
         GROUP BY filename
         HAVING COUNT(DISTINCT tag)>0
-    )";
+    )
+    ORDER BY filename ASC";
 
 pub const SELECT_FILES_FOR_INCLUDING_AND_EXCLUDING_TAGS: &str =
     "SELECT DISTINCT filename, file_source
@@ -71,20 +74,24 @@ pub const SELECT_FILES_FOR_INCLUDING_AND_EXCLUDING_TAGS: &str =
         WHERE tag IN (EXCLUDE_TAG_LIST)
         GROUP BY filename
         HAVING COUNT(DISTINCT tag)>0
-    )";
+    )
+    ORDER BY filename ASC";
 
 pub const SELECT_TAGS_FOR_FILE: &str =
     "SELECT tags.tag, tags.tag_type FROM file_tags
     JOIN tags ON file_tags.tag = tags.tag
-    WHERE file_tags.filename = (?)";
+    WHERE file_tags.filename = (?)
+    ORDER BY tags.tag_type ASC, tags.tag ASC";
 
 pub const SELECT_ALL_TAGS: &str =
-    "SELECT tag, tag_type FROM tags";
+    "SELECT tag, tag_type FROM tags
+    ORDER BY tag_type ASC, tag ASC";
 
 pub const SELECT_TAGS_WITH_TYPE_PLACEHOLDER: &str = "TAG_TYPE_LIST";
 pub const SELECT_TAGS_WITH_TYPE: &str =
     "SELECT tag, tag_type FROM tags
-    WHERE tag_type IN (TAG_TYPE_LIST)";
+    WHERE tag_type IN (TAG_TYPE_LIST)
+    ORDER BY tag_type ASC, tag ASC";
 
 // insert statements
 pub const INSERT_TAG_INTO_TAG_LIST: &str =
