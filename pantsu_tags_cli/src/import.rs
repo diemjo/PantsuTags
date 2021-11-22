@@ -2,7 +2,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 use colored::Colorize;
 use pantsu_tags::db::PantsuDB;
-use pantsu_tags::{Error, get_thumbnail_link, SauceMatch};
+use pantsu_tags::{Error, get_thumbnail_link, Sauce, SauceMatch};
 use crate::common::{AppError, AppResult};
 use crate::feh;
 
@@ -93,7 +93,7 @@ fn import_one_image_auto_source(pdb: &mut PantsuDB, image: &PathBuf) -> Result<(
         Some(sauce) => {
             if sauce.similarity > FOUND_SIMILARITY_THRESHOLD {
                 let tags = pantsu_tags::get_sauce_tags(sauce)?;
-                pantsu_tags::store_image_with_tags_from_sauce(pdb, &image_handle, sauce, &tags)?;
+                pantsu_tags::store_image_with_tags(pdb, &image_handle, Sauce::Match(sauce.link.clone()), &tags)?;
             }
             else {
                 return Err(AppError::SauceUnsure(relevant_sauces));
@@ -108,7 +108,7 @@ fn import_one_image_auto_source(pdb: &mut PantsuDB, image: &PathBuf) -> Result<(
 
 fn import_one_image(pdb: &mut PantsuDB, image: &Path) -> AppResult<()> {
     let image_handle = pantsu_tags::new_image_handle(pdb, &image, true)?;
-    pantsu_tags::store_image_with_tags(pdb, &image_handle, &Vec::new()).map_err(|e| AppError::LibError(e))
+    pantsu_tags::store_image_with_tags(pdb, &image_handle, Sauce::NotChecked, &Vec::new()).map_err(|e| AppError::LibError(e))
 }
 
 fn resolve_sauce_unsure(pdb: &mut PantsuDB, images_to_resolve: &Vec<SauceUnsure>) -> AppResult<()>{
@@ -147,7 +147,7 @@ fn resolve_sauce_unsure(pdb: &mut PantsuDB, images_to_resolve: &Vec<SauceUnsure>
                 let correct_sauce = &image.matches[num];
                 let tags = pantsu_tags::get_sauce_tags(correct_sauce)?;
                 let image_handle = pantsu_tags::new_image_handle(pdb, &image.path, false)?; // at this point, if there is a similar image it's approved by the user
-                pantsu_tags::store_image_with_tags_from_sauce(pdb, &image_handle, correct_sauce, &tags)?;
+                pantsu_tags::store_image_with_tags(pdb, &image_handle, Sauce::Match(correct_sauce.link.clone()), &tags)?;
                 println!("{}", "Successfully added tags to image".green());
                 break;
             }

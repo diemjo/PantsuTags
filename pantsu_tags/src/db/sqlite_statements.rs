@@ -6,7 +6,7 @@ pub const PRAGMA_FOREIGN_KEY_ENFORCE: &str =
 pub const CREATE_FILES_TABLE: &str =
     "CREATE TABLE IF NOT EXISTS files (
             filename TEXT PRIMARY KEY,
-            file_source TEXT
+            file_source TEXT NOT NULL
     )";
 
 pub const CREATE_TAGS_TABLE: &str =

@@ -156,9 +156,12 @@ mod tests {
     use crate::db::PantsuDB;
 
     use serial_test::serial;
+    use crate::Sauce;
+    use crate::Sauce::Match;
 
     #[test]
     #[serial]
+    #[ignore]
     fn db_add_file_twice() {
         let mut pdb = get_pantsu_db(Some(std::env::current_dir().unwrap().as_path())).unwrap();
         pdb.clear().unwrap();
@@ -173,8 +176,8 @@ mod tests {
         pdb.clear().unwrap();
         let img = &get_test_image();
         pdb.add_file(img).unwrap();
-        pdb.update_file_source(&ImageFile{ filename: img.filename.clone(), file_source: Some(String::from("https://fake.url")) }).unwrap();
-        assert_eq!(pdb.get_file(&img.filename).unwrap().unwrap().file_source, Some(String::from("https://fake.url")));
+        pdb.update_file_source(&ImageFile{ filename: img.filename.clone(), file_source: Sauce::Match(String::from("https://fake.url")) }).unwrap();
+        assert_eq!(pdb.get_file(&img.filename).unwrap().unwrap().file_source, Sauce::Match(String::from("https://fake.url")));
     }
 
     #[test]
@@ -354,10 +357,10 @@ mod tests {
     }
 
     fn get_test_image() -> ImageFile {
-        ImageFile { filename: String::from("test_image_1db8ab6c94e95f36a9dd5bde347f6dd1.png"), file_source: None }
+        ImageFile { filename: String::from("test_image_1db8ab6c94e95f36a9dd5bde347f6dd1.png"), file_source: Sauce::NotChecked }
     }
 
     fn get_test_image2() -> ImageFile {
-        ImageFile { filename: String::from("test_image_4f76b8d52983af1d28b1bf8d830d684e.png"), file_source: Some(String::from("http://real.url")) }
+        ImageFile { filename: String::from("test_image_4f76b8d52983af1d28b1bf8d830d684e.png"), file_source: Match(String::from("http://real.url")) }
     }
 }

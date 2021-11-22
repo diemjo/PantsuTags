@@ -158,7 +158,7 @@ mod query_helpers {
             Ok(
                 ImageFile {
                     filename: row.get(0).unwrap(),
-                    file_source: row.get(1).ok()
+                    file_source: row.get(1).unwrap()
                 }
             )
         });
@@ -174,7 +174,7 @@ mod query_helpers {
             Ok(
                 ImageFile {
                     filename: row.get(0).unwrap(),
-                    file_source: row.get(1).ok()
+                    file_source: row.get(1).unwrap()
                 }
             )
         }).unwrap().collect();

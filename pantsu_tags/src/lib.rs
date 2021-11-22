@@ -7,6 +7,7 @@ use crate::file_handler::import;
 pub use crate::common::error::Error;
 pub use crate::common::error::Result;
 pub use crate::common::image_file::ImageFile;
+pub use crate::common::image_file::Sauce;
 pub use crate::common::pantsu_tag::PantsuTag;
 pub use crate::sauce::SauceMatch;
 pub use crate::sauce::get_thumbnail_link;
@@ -46,21 +47,11 @@ pub fn get_sauce_tags(sauce: &SauceMatch) -> Result<Vec<PantsuTag>> {
     sauce::find_tags_gelbooru(&sauce.link)
 }
 
-pub fn store_image_with_tags_from_sauce(pantsu_db: &mut PantsuDB, image: &ImageHandle, sauce: &SauceMatch, tags: &Vec<PantsuTag>) -> Result<()> {
+pub fn store_image_with_tags(pantsu_db: &mut PantsuDB, image: &ImageHandle, sauce: Sauce, tags: &Vec<PantsuTag>) -> Result<()> {
     pantsu_db.add_file_and_tags(
         &ImageFile {
             filename: String::from(image.get_filename()),
-            file_source: Some(String::from(&sauce.link)),
-        },
-        tags
-    )
-}
-
-pub fn store_image_with_tags(pantsu_db: &mut PantsuDB, image: &ImageHandle, tags: &Vec<PantsuTag>) -> Result<()> {
-    pantsu_db.add_file_and_tags(
-        &ImageFile {
-            filename: String::from(image.get_filename()),
-            file_source: None,
+            file_source: sauce
         },
         tags
     )
@@ -75,7 +66,7 @@ fn get_similar_images(pantsu_db: &PantsuDB, file_name: &String, min_dist: u32) -
 mod tests {
     use std::io::Cursor;
     use std::path::PathBuf;
-    use crate::{get_image_sauces, get_sauce_tags, get_similar_images, ImageFile, new_image_handle, PantsuDB, PantsuTag, SIMILARITY_THESHOLD, store_image_with_tags_from_sauce};
+    use crate::{ImageFile, PantsuDB, PantsuTag, Sauce};
     use crate::file_handler::hash;
     use serial_test::serial;
 
@@ -87,12 +78,12 @@ mod tests {
         let mut pdb = PantsuDB::new(&db_path).unwrap();
         let image_path = prepare_image("https://img1.gelbooru.com/images/4f/76/4f76b8d52983af1d28b1bf8d830d684e.png");
 
-        let image_handle = new_image_handle(&pdb, &image_path, false).unwrap();
-        let sauces = get_image_sauces(&image_handle).unwrap();
+        let image_handle = crate::new_image_handle(&pdb, &image_path, false).unwrap();
+        let sauces = crate::get_image_sauces(&image_handle).unwrap();
         let best_match = &sauces[0];
         // in general, you would want to check the similarity here
-        let tags = get_sauce_tags(&best_match).unwrap();
-        store_image_with_tags_from_sauce(&mut pdb, &image_handle, &best_match, &tags).unwrap();
+        let tags = crate::get_sauce_tags(&best_match).unwrap();
+        crate::store_image_with_tags(&mut pdb, &image_handle, Sauce::Match(best_match.link.clone()), &tags).unwrap();
     }
 
     #[test]
@@ -109,14 +100,14 @@ mod tests {
         let mut pdb = PantsuDB::new(&db_path).unwrap();
         pdb.clear().unwrap();
         pdb.add_file_and_tags(
-            &ImageFile { filename: image_name, file_source: None },
+            &ImageFile { filename: image_name, file_source: Sauce::NotChecked },
             &vec![PantsuTag{tag_name: String::from("Hehe"), tag_type: "general".parse().unwrap()}]
         ).unwrap();
         pdb.add_file_and_tags(
-            &ImageFile { filename: not_similar_image_name, file_source: None },
+            &ImageFile { filename: not_similar_image_name, file_source: Sauce::NotChecked },
             &vec![PantsuTag{tag_name: String::from("Hehe"), tag_type: "general".parse().unwrap()}]
         ).unwrap();
-        let similar_images = get_similar_images(&pdb, &similar_image_name, 10).unwrap();
+        let similar_images = crate::get_similar_images(&pdb, &similar_image_name, 10).unwrap();
         assert_eq!(similar_images.len(), 1);
     }
 
