@@ -12,7 +12,7 @@ const FOUND_SIMILARITY_THRESHOLD: i32 = 90;
 // sauce matches with a higher similarity are relevant. (Others will be discarded)
 const RELEVANT_SIMILARITY_THESHOLD: i32 = 45;
 
-pub fn import(no_auto_sources: bool, images: Vec<PathBuf>) -> AppResult<()> {
+pub fn import(no_auto_sources: bool, no_feh: bool, images: Vec<PathBuf>) -> AppResult<()> {
     #[derive(Default)]
     struct ImportStats {
         success: u64,
@@ -82,7 +82,7 @@ pub fn import(no_auto_sources: bool, images: Vec<PathBuf>) -> AppResult<()> {
 
     // todo: handle similar images here
 
-    resolve_sauce_unsure(&mut pdb, &unsure_source_images)?;
+    resolve_sauce_unsure(&mut pdb, &unsure_source_images, no_feh)?;
     Ok(())
 }
 
@@ -112,7 +112,7 @@ fn import_one_image(pdb: &mut PantsuDB, image: &Path) -> AppResult<()> {
     pantsu_tags::store_image_with_tags(pdb, &image_handle, Sauce::NotChecked, &Vec::new()).map_err(|e| AppError::LibError(e))
 }
 
-fn resolve_sauce_unsure(pdb: &mut PantsuDB, images_to_resolve: &Vec<SauceUnsure>) -> AppResult<()>{
+fn resolve_sauce_unsure(pdb: &mut PantsuDB, images_to_resolve: &Vec<SauceUnsure>, no_feh: bool) -> AppResult<()>{
     if images_to_resolve.is_empty() {
         return Ok(());
     }
@@ -121,7 +121,7 @@ fn resolve_sauce_unsure(pdb: &mut PantsuDB, images_to_resolve: &Vec<SauceUnsure>
     println!("\n\nResolving {} images with unsure sources manually:", images_to_resolve.len());
     for image in images_to_resolve {
         let image_name = image.path.to_str().unwrap_or("(can't display image name)");
-        let mut thumbnails = ThumbnailDisplayer::new(true);
+        let mut thumbnails = ThumbnailDisplayer::new(!no_feh);
         println!("\nImage {}:\n", image_name);
         for (index, sauce) in image.matches.iter().enumerate() {
             thumbnails.add_thumbnail_link(sauce);

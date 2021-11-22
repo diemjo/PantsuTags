@@ -6,8 +6,11 @@ use pantsu_tags::{PantsuTag, PantsuTagType};
 #[structopt(name = "PantsuTags", about = "PantsuTags CLI")]
 pub enum Args {
     Import {
-        #[structopt(short="s", long)]
+        #[structopt(long)]
         no_auto_sources: bool,
+
+        #[structopt(long)]
+        no_feh: bool,
 
         #[structopt(parse(from_os_str))]
         images: Vec<PathBuf>,
