@@ -1,13 +1,11 @@
 use structopt::StructOpt;
-use pantsu_tags::Error;
-use pantsu_tags::SauceMatch;
 use crate::cli::Args;
 use crate::common::AppError;
-use crate::common::AppResult;
 mod common;
 mod cli;
 mod get;
 mod import;
+mod feh;
 
 
 fn main() -> Result<(), AppError> {
