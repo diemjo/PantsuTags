@@ -5,13 +5,14 @@ use pantsu_tags::db::PantsuDB;
 use pantsu_tags::{Error, get_thumbnail_link, Sauce, SauceMatch};
 use crate::common::{AppError, AppResult};
 use crate::feh;
+use crate::feh::FehProcesses;
 
 // sauce matches with a higher similarity will be automatically accepted
 const FOUND_SIMILARITY_THRESHOLD: i32 = 90;
 // sauce matches with a higher similarity are relevant. (Others will be discarded)
 const RELEVANT_SIMILARITY_THESHOLD: i32 = 45;
 
-pub fn import(no_auto_sources: bool, images: Vec<PathBuf>) -> Result<(), AppError> {
+pub fn import(no_auto_sources: bool, images: Vec<PathBuf>) -> AppResult<()> {
     #[derive(Default)]
     struct ImportStats {
         success: u64,
@@ -85,7 +86,7 @@ pub fn import(no_auto_sources: bool, images: Vec<PathBuf>) -> Result<(), AppErro
     Ok(())
 }
 
-fn import_one_image_auto_source(pdb: &mut PantsuDB, image: &PathBuf) -> Result<(), AppError> {
+fn import_one_image_auto_source(pdb: &mut PantsuDB, image: &PathBuf) -> AppResult<()> {
     let image_handle = pantsu_tags::new_image_handle(pdb, &image, true)?;
     let sauces = pantsu_tags::get_image_sauces(&image_handle)?;
     let relevant_sauces: Vec<SauceMatch> = sauces.into_iter().filter(|s| s.similarity > RELEVANT_SIMILARITY_THESHOLD).collect();
@@ -120,19 +121,13 @@ fn resolve_sauce_unsure(pdb: &mut PantsuDB, images_to_resolve: &Vec<SauceUnsure>
     println!("\n\nResolving {} images with unsure sources manually:", images_to_resolve.len());
     for image in images_to_resolve {
         let image_name = image.path.to_str().unwrap_or("(can't display image name)");
-        let mut sauce_thumbnails: Vec<String> = Vec::new();
+        let mut thumbnails = ThumbnailDisplayer::new(true);
         println!("\nImage {}:\n", image_name);
         for (index, sauce) in image.matches.iter().enumerate() {
-            sauce_thumbnails.push(get_thumbnail_link(sauce)?);
+            thumbnails.add_thumbnail_link(sauce);
             println!("{} - {}", index, sauce.link);
         }
-        let links = sauce_thumbnails.iter().map(|s| s.as_str()).collect();
-        let feh_procs = feh::feh_compare_image(
-            image_name,
-            &links,
-            "Original",
-            "Potential Source"
-        );
+        thumbnails.feh_display(image_name);
         loop {
             println!("If one of the sources is correct, enter the corresponding number.");
             println!("Enter 'n' if there is no match, or 's' to skip all remaining images.");
@@ -158,17 +153,68 @@ fn resolve_sauce_unsure(pdb: &mut PantsuDB, images_to_resolve: &Vec<SauceUnsure>
             }
             else if input.eq("s") {
                 println!("Skip remaining images");
-                feh_procs.kill();
+                thumbnails.kill_feh();
                 return Ok(());
             }
             println!("Invalid input");
         }
-        feh_procs.kill();
+        thumbnails.kill_feh();
     }
+
     Ok(())
 }
 
 struct SauceUnsure<'a> {
     pub path: &'a Path,
     pub matches: Vec<SauceMatch>,
+}
+
+struct ThumbnailDisplayer {
+    thumbnail_links: Vec<String>,
+    enabled: bool,
+    feh_processes: Option<FehProcesses>,
+}
+impl ThumbnailDisplayer {
+    fn new(enable: bool) -> Self {
+        ThumbnailDisplayer {
+            thumbnail_links: Vec::new(),
+            enabled: enable,
+            feh_processes: None,
+        }
+    }
+
+    fn add_thumbnail_link(&mut self, sauce: &SauceMatch) {
+        if !self.enabled {
+            return;
+        }
+        let link = match get_thumbnail_link(sauce) {
+            Ok(link) => link,
+            Err(_) => {
+                self.enabled = false; // if left enabled without adding a thumbnail, the indices will be wrong.
+                return;
+            },
+        };
+        self.thumbnail_links.push(link);
+    }
+
+    fn feh_display(&mut self, image: &str) {
+        if !self.enabled {
+            return;
+        }
+        let links = self.thumbnail_links.iter().map(|s| s.as_str()).collect();
+        self.feh_processes = Some(feh::feh_compare_image(
+            image,
+            &links,
+            "Original",
+            "Potential Source"
+        ));
+    }
+
+    fn kill_feh(&mut self) {
+        let procs = self.feh_processes.take();
+        if let Some(procs) = procs {
+            procs.kill();
+        }
+
+    }
 }
