@@ -1,9 +1,10 @@
 use std::io;
 use std::path::{Path, PathBuf};
+use std::process::{Child, Command, Stdio};
 use colored::Colorize;
 use structopt::StructOpt;
 use pantsu_tags::db::PantsuDB;
-use pantsu_tags::{Error, ImageFile};
+use pantsu_tags::{Error, get_thumbnail_link, ImageFile};
 use pantsu_tags::SauceMatch;
 use crate::cli::Args;
 
@@ -134,10 +135,6 @@ fn import_one_image_auto_source(pdb: &mut PantsuDB, image: &PathBuf) -> Result<(
     Ok(())
 }
 
-//feh --info 'echo "%u"' https://img3.gelbooru.com/images/bb/62/bb626c2a621cbc1642256c0ebefbd219.jpg https://img3.gelbooru.com/images/12/ee/12ee1ac61779f5ccfcc383485c7c3191.png
-//zero indexed:
-//feh --info 'echo "$((%u -1))"' https://img3.gelbooru.com/images/bb/62/bb626c2a621cbc1642256c0ebefbd219.jpg https://img3.gelbooru.com/images/12/ee/12ee1ac61779f5ccfcc383485c7c3191.png
-
 fn import_one_image(pdb: &mut PantsuDB, image: &Path) -> AppResult<()> {
     let image_handle = pantsu_tags::new_image_handle(pdb, &image, true)?;
     pantsu_tags::store_image_with_tags(pdb, &image_handle, &Vec::new()).map_err(|e| AppError::LibError(e))
@@ -152,10 +149,19 @@ fn resolve_sauce_unsure(pdb: &mut PantsuDB, images_to_resolve: &Vec<SauceUnsure>
     println!("\n\nResolving {} images with unsure sources manually:", images_to_resolve.len());
     for image in images_to_resolve {
         let image_name = image.path.to_str().unwrap_or("(can't display image name)");
+        let mut sauce_thumbnails: Vec<String> = Vec::new();
         println!("\nImage {}:\n", image_name);
         for (index, sauce) in image.matches.iter().enumerate() {
+            sauce_thumbnails.push(get_thumbnail_link(sauce)?);
             println!("{} - {}", index, sauce.link);
         }
+        let links = sauce_thumbnails.iter().map(|s| s.as_str()).collect();
+        let feh_commands = feh_compare_image(
+            image_name,
+            &links,
+            "Original",
+            "Potential Source"
+        );
         loop {
             println!("If one of the sources is correct, enter the corresponding number.");
             println!("Enter 'n' if there is no match, or 's' to skip all remaining images.");
@@ -181,12 +187,63 @@ fn resolve_sauce_unsure(pdb: &mut PantsuDB, images_to_resolve: &Vec<SauceUnsure>
             }
             else if input.eq("s") {
                 println!("Skip remaining images");
+                feh_commands.map(|mut cmd| {
+                    let _ = cmd.0.kill();
+                    let _ = cmd.1.kill();
+                });
                 return Ok(());
             }
             println!("Invalid input");
         }
+        feh_commands.map(|mut cmd| {
+            let _ = cmd.0.kill();
+            let _ = cmd.1.kill();
+        });
     }
     Ok(())
+}
+
+//feh --info 'echo "%u"' https://img3.gelbooru.com/images/bb/62/bb626c2a621cbc1642256c0ebefbd219.jpg https://img3.gelbooru.com/images/12/ee/12ee1ac61779f5ccfcc383485c7c3191.png
+//zero indexed:
+//feh --info 'echo "$((%u -1))"' https://img3.gelbooru.com/images/bb/62/bb626c2a621cbc1642256c0ebefbd219.jpg https://img3.gelbooru.com/images/12/ee/12ee1ac61779f5ccfcc383485c7c3191.png
+
+fn feh_compare_image(image: &str, other_images: &Vec<&str>, image_label: &str, other_images_label: &str) -> Option<(Child, Child)> {
+    let command_image = format!("feh -q.ZB black --info \'echo \"{}\"\' \'{}\'", image_label, image);
+
+    let mut command_other_images = format!("feh -q.ZB black --info \'echo \"$((%u -1)) {}\"\'", other_images_label);
+    for &image in other_images {
+        command_other_images.push_str(" \'");
+        command_other_images.push_str(image);
+        command_other_images.push('\'');
+    }
+
+    let cmd_image = Command::new("sh")
+        .arg("-c")
+        .arg(command_image)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn();
+    let mut cmd_image = match cmd_image {
+        Ok(cmd) => cmd,
+        Err(_) => return None,
+    };
+
+    let cmd_other_images = Command::new("sh")
+        .arg("-c")
+        .arg(command_other_images)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn();
+    let cmd_other_images = match cmd_other_images {
+        Ok(cmd) => cmd,
+        Err(_) => {
+            let _ = cmd_image.kill();
+            return None;
+        }
+    };
+    Some((cmd_image, cmd_other_images))
 }
 
 struct SauceUnsure<'a> {
