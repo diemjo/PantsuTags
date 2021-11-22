@@ -7,7 +7,9 @@ use pantsu_tags::db::PantsuDB;
 use pantsu_tags::{Error, get_thumbnail_link};
 use pantsu_tags::SauceMatch;
 use crate::cli::Args;
-
+use crate::common::AppError;
+use crate::common::AppResult;
+mod common;
 mod cli;
 mod get;
 
@@ -250,21 +252,4 @@ fn feh_compare_image(image: &str, other_images: &Vec<&str>, image_label: &str, o
 struct SauceUnsure<'a> {
     pub path: &'a Path,
     pub matches: Vec<SauceMatch>,
-}
-
-type AppResult<T> = std::result::Result<T, AppError>;
-
-#[derive(Debug, thiserror::Error)]
-pub enum AppError {
-    #[error("Couldn't find relevant sauces")]
-    NoRelevantSauces,
-
-    #[error("Not sure whether sauce is correct or not")]
-    SauceUnsure(Vec<SauceMatch>),
-
-    #[error("Failed to read from stdin")]
-    StdinReadError(#[source]std::io::Error),
-
-    #[error(transparent)]
-    LibError(#[from] Error),
 }
