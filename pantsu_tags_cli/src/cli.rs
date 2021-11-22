@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 use structopt::StructOpt;
+use pantsu_tags::{PantsuTag, PantsuTagType};
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "PantsuTags", about = "PantsuTags CLI")]
@@ -20,9 +21,36 @@ pub enum Args {
         #[structopt(short, long)]
         exclude_tags: Vec<String>,
     },
-    #[structopt(about="List tags in database, filter by tag type if provided")]
-    ListTags {
-        #[structopt(short, long="type")]
-        tag_type: Vec<String>
+    #[structopt(about="Add and remove tags from images or list tags in database")]
+    Tag(TagArgs),
+}
+
+#[derive(Debug, StructOpt)]
+pub enum TagArgs {
+    #[structopt(about = "List tags in database")]
+    List {
+        #[structopt(about = "Filter tags to list by tags type")]
+        #[structopt(short, long="types", parse(try_from_str))]
+        tag_types: Vec<PantsuTagType>,
+    },
+
+    #[structopt(about="Add tags to an image")]
+    Add {
+        #[structopt(about = "Tags to add to the image")]
+        #[structopt(parse(try_from_str))]
+        tags: Vec<PantsuTag>,
+
+        #[structopt(about = "The image to add tags to")]
+        #[structopt(short, long, parse(from_str))]
+        image: String
+    },
+    #[structopt(about="Remove tags from an image")]
+    Rm {
+        #[structopt(about = "Tags to remove from the image")]
+        tags: Vec<String>,
+
+        #[structopt(about = "The image to remove tags from")]
+        #[structopt(short, long, parse(from_str))]
+        image: String
     }
 }
