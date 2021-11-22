@@ -1,8 +1,9 @@
+use std::io;
 use std::path::{Path, PathBuf};
 use colored::Colorize;
 use structopt::StructOpt;
 use pantsu_tags::db::PantsuDB;
-use pantsu_tags::{Error, ImageFile, PantsuTag};
+use pantsu_tags::{Error, ImageFile};
 use pantsu_tags::SauceMatch;
 use crate::cli::Args;
 
@@ -41,18 +42,19 @@ fn main() -> Result<(), AppError> {
 fn import(no_auto_sources: bool, images: Vec<PathBuf>) -> Result<(), AppError> {
     #[derive(Default)]
     struct ImportStats {
-        success: i64,
-        already_exists: i64,
-        similar_exists: i64,
-        could_not_open: i64,
-        no_source: i64,
-        source_unsure: i64,
+        success: u64,
+        already_exists: u64,
+        similar_exists: u64,
+        could_not_open: u64,
+        no_source: u64,
+        source_unsure: u64,
     }
 
     let mut import_stats = ImportStats::default();
+    let mut unsure_source_images: Vec<SauceUnsure> = Vec::new();
     let pdb_path = Path::new("./pantsu_tags.db");
     let mut pdb = PantsuDB::new(pdb_path)?;
-    for image in images {
+    for image in &images {
         let image_name = image.to_str().unwrap_or("(can't display image name)");
         let res = if no_auto_sources {
             import_one_image(&mut pdb, &image)
@@ -88,8 +90,13 @@ fn import(no_auto_sources: bool, images: Vec<PathBuf>) -> Result<(), AppError> {
             },
             Err(AppError::SauceUnsure(sauce_matches)) => {
                 import_stats.source_unsure += 1;
+                unsure_source_images.push(SauceUnsure {
+                    path: &image,
+                    matches: sauce_matches,
+                });
                 println!("{} - {}", "Source could be wrong      ".yellow(), image_name);
-            }
+            },
+            Err(e@AppError::StdinReadError(_)) => eprintln!("Unexpected error: {}", e),
         }
     }
     println!("\n\n{}", "Done".green().blink());
@@ -99,6 +106,10 @@ fn import(no_auto_sources: bool, images: Vec<PathBuf>) -> Result<(), AppError> {
     println!("Source not found:      {}", import_stats.no_source);
     println!("Already exists:        {}", import_stats.already_exists);
     println!("Couldn't open image:   {}", import_stats.could_not_open);
+
+    // todo: handle similar images here
+
+    resolve_sauce_unsure(&mut pdb, &unsure_source_images)?;
     Ok(())
 }
 
@@ -123,10 +134,64 @@ fn import_one_image_auto_source(pdb: &mut PantsuDB, image: &PathBuf) -> Result<(
     Ok(())
 }
 
-fn import_one_image(pdb: &mut PantsuDB, image: &PathBuf) -> Result<(), AppError> {
+//feh --info 'echo "%u"' https://img3.gelbooru.com/images/bb/62/bb626c2a621cbc1642256c0ebefbd219.jpg https://img3.gelbooru.com/images/12/ee/12ee1ac61779f5ccfcc383485c7c3191.png
+//zero indexed:
+//feh --info 'echo "$((%u -1))"' https://img3.gelbooru.com/images/bb/62/bb626c2a621cbc1642256c0ebefbd219.jpg https://img3.gelbooru.com/images/12/ee/12ee1ac61779f5ccfcc383485c7c3191.png
+
+fn import_one_image(pdb: &mut PantsuDB, image: &Path) -> AppResult<()> {
     let image_handle = pantsu_tags::new_image_handle(pdb, &image, true)?;
-    let no_tags: Vec<PantsuTag> = Vec::new();
-    pantsu_tags::store_image_with_tags(pdb, &image_handle, &no_tags).map_err(|e| AppError::LibError(e))
+    pantsu_tags::store_image_with_tags(pdb, &image_handle, &Vec::new()).map_err(|e| AppError::LibError(e))
+}
+
+fn resolve_sauce_unsure(pdb: &mut PantsuDB, images_to_resolve: &Vec<SauceUnsure>) -> AppResult<()>{
+    if images_to_resolve.is_empty() {
+        return Ok(());
+    }
+    let mut input = String::new();
+    let stdin = io::stdin();
+    println!("\n\nResolving {} images with unsure sources manually:", images_to_resolve.len());
+    for image in images_to_resolve {
+        let image_name = image.path.to_str().unwrap_or("(can't display image name)");
+        println!("\nImage {}:\n", image_name);
+        for (index, sauce) in image.matches.iter().enumerate() {
+            println!("{} - {}", index, sauce.link);
+        }
+        loop {
+            println!("If one of the sources is correct, enter the corresponding number.");
+            println!("Enter 'n' if there is no match, or 's' to skip all remaining images.");
+            input.clear();
+            stdin.read_line(&mut input).or_else(|e| Err(AppError::StdinReadError(e)))?;
+            let input = input.trim();
+            if let Ok(num) = input.parse::<usize>() {
+                if num >= image.matches.len() {
+                    println!("Number too big, the last source has number {}", image.matches.len()-1);
+                    continue;
+                }
+                let correct_sauce = &image.matches[num];
+                let tags = pantsu_tags::get_sauce_tags(correct_sauce)?;
+                let image_handle = pantsu_tags::new_image_handle(pdb, &image.path, false)?; // at this point, if there is a similar image it's approved by the user
+                pantsu_tags::store_image_with_tags_from_sauce(pdb, &image_handle, correct_sauce, &tags)?;
+                println!("{}", "Successfully added tags to image".green());
+                break;
+            }
+            if input.eq("n") {
+                // todo: mark in db that image has no source
+                println!("No tags added");
+                break;
+            }
+            else if input.eq("s") {
+                println!("Skip remaining images");
+                return Ok(());
+            }
+            println!("Invalid input");
+        }
+    }
+    Ok(())
+}
+
+struct SauceUnsure<'a> {
+    pub path: &'a Path,
+    pub matches: Vec<SauceMatch>,
 }
 
 fn get(included_tags: Vec<String>, excluded_tags: Vec<String>, temp_dir: Option<PathBuf>) -> Result<(), AppError> {
@@ -185,6 +250,9 @@ pub enum AppError {
 
     #[error("Not sure whether sauce is correct or not")]
     SauceUnsure(Vec<SauceMatch>),
+
+    #[error("Failed to read from stdin")]
+    StdinReadError(#[source]std::io::Error),
 
     #[error(transparent)]
     LibError(#[from] Error),
