@@ -95,9 +95,7 @@ fn import_one_image_auto_source(pdb: &mut PantsuDB, image: &PathBuf) -> AppResul
         Some(sauce) => {
             if sauce.similarity > FOUND_SIMILARITY_THRESHOLD {
                 let tags = pantsu_tags::get_sauce_tags(sauce)?;
-                pdb.add_file_with_source(&image_handle)?;
                 pdb.update_file_sauce_with_tags(image_handle, Sauce::Match(sauce.link.clone()), &tags)?;
-                //pantsu_tags::store_image_with_tags(pdb, &image_handle, Sauce::Match(sauce.link.clone()), &tags)?;
             }
             else { // store image without tags for now, tags can be added in the sauce resolution
                 return Err(AppError::SauceUnsure(image_handle, relevant_sauces));
@@ -113,7 +111,6 @@ fn import_one_image_auto_source(pdb: &mut PantsuDB, image: &PathBuf) -> AppResul
 
 fn import_one_image(pdb: &mut PantsuDB, image: &Path) -> AppResult<()> {
     pantsu_tags::new_image_handle(pdb, &image, true)?;
-    //pantsu_tags::store_image_with_tags(pdb, &image_handle, Sauce::NotChecked, &Vec::new()).map_err(|e| AppError::LibError(e))
     Ok(())
 }
 
@@ -148,12 +145,11 @@ fn resolve_sauce_unsure(pdb: &mut PantsuDB, images_to_resolve: Vec<SauceUnsure>,
                 let correct_sauce = &image.matches[num];
                 let tags = pantsu_tags::get_sauce_tags(correct_sauce)?;
                 pdb.update_file_sauce_with_tags(image.image_handle, Sauce::Match(correct_sauce.link.clone()), &tags)?;
-
                 println!("{}", "Successfully added tags to image".green());
                 break;
             }
             if input.eq("n") {
-                // todo: mark in db that image has no source
+                pdb.update_file_source(image.image_handle, Sauce::NonExistent)?;
                 println!("No tags added");
                 break;
             }
