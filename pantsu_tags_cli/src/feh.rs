@@ -13,6 +13,11 @@ impl FehProcesses {
     }
 }
 
+pub fn feh_available() -> bool {
+    which::which("sh").is_ok() &&
+        which::which("feh").is_ok()
+}
+
 //feh --info 'echo "$((%u -1))"' https://img3.gelbooru.com/images/bb/62/bb626c2a621cbc1642256c0ebefbd219.jpg https://img3.gelbooru.com/images/12/ee/12ee1ac61779f5ccfcc383485c7c3191.png
 
 pub fn feh_compare_image(image: &str, other_images: &Vec<&str>, image_label: &str, other_images_label: &str) -> FehProcesses {

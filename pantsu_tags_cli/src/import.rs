@@ -116,12 +116,13 @@ fn resolve_sauce_unsure(pdb: &mut PantsuDB, images_to_resolve: &Vec<SauceUnsure>
     if images_to_resolve.is_empty() {
         return Ok(());
     }
+    let use_feh = !no_feh && feh::feh_available();
     let mut input = String::new();
     let stdin = io::stdin();
     println!("\n\nResolving {} images with unsure sources manually:", images_to_resolve.len());
     for image in images_to_resolve {
         let image_name = image.path.to_str().unwrap_or("(can't display image name)");
-        let mut thumbnails = ThumbnailDisplayer::new(!no_feh);
+        let mut thumbnails = ThumbnailDisplayer::new(use_feh);
         println!("\nImage {}:\n", image_name);
         for (index, sauce) in image.matches.iter().enumerate() {
             thumbnails.add_thumbnail_link(sauce);
