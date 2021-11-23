@@ -48,6 +48,10 @@ impl PantsuDB {
 
     // file
     pub fn add_file_with_source(&mut self, file: &ImageHandle) -> Result<(), Error> {
+        if !file_handler::filename_is_valid(file.get_filename()) {
+            return Err(Error::InvalidFilename(String::from(file.get_filename())))
+        }
+
         let transaction = self.conn.transaction()?;
 
         db_calls::add_file_to_file_list(&transaction, file)?;
@@ -123,7 +127,7 @@ impl PantsuDB {
         Ok(new_handle)
     }
 
-    pub fn remove_tags(&mut self, file: &ImageHandle, tags: &Vec<PantsuTag>) -> Result<(), Error> {
+    pub fn remove_tags(&mut self, file: &ImageHandle, tags: &Vec<String>) -> Result<(), Error> {
         let transaction = self.conn.transaction()?;
 
         db_calls::remove_tags_from_file(&transaction, file, tags)?;

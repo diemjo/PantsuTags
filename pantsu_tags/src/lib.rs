@@ -49,7 +49,7 @@ pub fn get_sauce_tags(sauce: &SauceMatch) -> Result<Vec<PantsuTag>> {
 
 fn get_similar_images(pantsu_db: &PantsuDB, file_name: &String, min_dist: u32) -> Result<Vec<String>> {
     let files = pantsu_db.get_all_files()?;
-    Ok(file_handler::hash::get_similarity_distances(file_name, files, min_dist))
+    file_handler::hash::get_similarity_distances(file_name, files, min_dist)
 }
 
 #[cfg(test)]

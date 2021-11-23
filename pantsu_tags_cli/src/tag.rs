@@ -1,6 +1,6 @@
 use std::path::Path;
 use pantsu_tags::db::PantsuDB;
-use pantsu_tags::{Error, PantsuTag, PantsuTagType};
+use pantsu_tags::{Error, file_handler, PantsuTag, PantsuTagType};
 use crate::cli::TagArgs;
 use crate::common::AppResult;
 
@@ -25,15 +25,31 @@ fn tag_list(tag_types: Vec<PantsuTagType>) -> AppResult<()> {
     Ok(())
 }
 
-fn tag_add(_tags: Vec<PantsuTag>, image: String) -> AppResult<()> {
-    let db = PantsuDB::new(Path::new("./pantsu_tags.db"))?;
-    if db.get_file(&image)?.is_none() {
-        Err(Error::ImageNotFoundInDB(image))?
-    }
+fn tag_add(tags: Vec<PantsuTag>, image: String) -> AppResult<()> {
+    let mut db = PantsuDB::new(Path::new("./pantsu_tags.db"))?;
+    let image = get_filename(image)?;
+    let image =  db.get_file(&image)?
+        .ok_or_else(|| Error::ImageNotFoundInDB(image))?;
+    db.add_tags_to_file(&image, &tags)?;
     Ok(())
 }
 
-fn tag_rm(_tags: Vec<String>, _image: String) -> AppResult<()> {
-    let _db = PantsuDB::new(Path::new("./pantsu_tags.db"))?;
+fn tag_rm(tags: Vec<String>, image: String) -> AppResult<()> {
+    let mut db = PantsuDB::new(Path::new("./pantsu_tags.db"))?;
+    let image = get_filename(image)?;
+    let image =  db.get_file(&image)?
+        .ok_or_else(|| Error::ImageNotFoundInDB(image))?;
+    db.remove_tags(&image, &tags)?;
     Ok(())
+}
+
+fn get_filename(image: String) -> AppResult<String> {
+    let filename = Path::new(&image)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or(Error::InvalidFilename(image.clone()))?;
+    if !file_handler::filename_is_valid(filename) {
+        Err(Error::InvalidFilename(image.clone()))?;
+    }
+    Ok(String::from(filename))
 }

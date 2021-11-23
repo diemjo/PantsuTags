@@ -4,6 +4,7 @@ use blockhash::{Blockhash144, Image};
 use image::{DynamicImage, GenericImageView, ImageError};
 use lz_fnv::{Fnv1a, FnvHasher};
 use crate::common::error;
+use crate::common::error::Result;
 use crate::common::error::Error;
 use crate::ImageHandle;
 
@@ -21,7 +22,7 @@ impl Image for AdapterImage {
     }
 }
 
-pub fn calculate_filename(path: &Path) -> Result<String, Error>{
+pub fn calculate_filename(path: &Path) -> Result<String> {
     let file_content = std::fs::read(&path).or_else(|_|
         Err(Error::ImageLoadError(error::get_path(&path)))
     )?;
@@ -35,24 +36,28 @@ pub fn calculate_filename(path: &Path) -> Result<String, Error>{
     Ok(format!("{}-{}.{}", fnv1a_hash, perceptual_hash, file_extension))
 }
 
-pub fn get_similarity_distances(filename: &String, files: Vec<ImageHandle>, min_dist: u32) -> Vec<String> {
-    let file_hash = extract_hash(filename);
-    files.into_iter()
+pub fn get_similarity_distances(filename: &String, files: Vec<ImageHandle>, min_dist: u32) -> Result<Vec<String>> {
+    let file_hash = extract_hash(filename)?;
+    Ok(files.into_iter()
         .filter(|file|{
-            let p_hash = extract_hash(file.get_filename());
+            let p_hash = extract_hash(file.get_filename()).unwrap();
             let dist = file_hash.distance(&p_hash);
             dist < min_dist
         }).map(|file|{
             String::from(file.get_filename())
         }).filter(|file|{
             file!=filename
-        }).collect::<Vec<String>>()
+        }).collect::<Vec<String>>())
 }
 
-fn extract_hash(filename: &str) -> Blockhash144 {
+fn extract_hash(filename: &str) -> Result<Blockhash144> {
+    let filename = filename.trim();
+    if super::filename_is_valid(filename) {
+        return Err(Error::InvalidFilename(String::from(filename)))
+    }
     // 0-15=fnv_hash, 16='-', 17-52=p_hash, 53='.', 54+=extension
     let p_hash = &filename[17..53];
-    Blockhash144::from_str(p_hash).unwrap()
+    Ok(Blockhash144::from_str(p_hash).unwrap())
 }
 
 fn get_fnv1a_hash(bytes: &Vec<u8>) -> String {
@@ -61,13 +66,13 @@ fn get_fnv1a_hash(bytes: &Vec<u8>) -> String {
     format!("{:016x}", fnv.finish())
 }
 
-fn get_perceptual_hash(bytes: &[u8]) -> Result<String, ImageError> {
+fn get_perceptual_hash(bytes: &[u8]) -> std::result::Result<String, ImageError> {
     let image = image::load_from_memory(bytes)?;
     let hash = blockhash::blockhash144(&AdapterImage { image });
     Ok(hash.to_string())
 }
 
-fn get_file_extension(path: &Path) -> Result<String, Error> {
+fn get_file_extension(path: &Path) -> Result<String> {
     let file_extension = path.extension().ok_or_else(||
         Error::ImageLoadError(error::get_path(&path))
     )?;
@@ -86,7 +91,7 @@ mod tests {
     #[test]
     fn test_hash_extract() {
         let name = String::from("9cc02982301095ef-7c7703613f313831e31e34e25cd7cd7e05c0.png");
-        let hash = extract_hash(&name);
+        let hash = extract_hash(&name).unwrap();
         println!("{:?}", hash);
         assert_eq!(hash, Blockhash144::from_str("7c7703613f313831e31e34e25cd7cd7e05c0").unwrap())
     }

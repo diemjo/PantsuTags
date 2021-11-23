@@ -54,10 +54,10 @@ pub fn remove_file_from_file_list(transaction: &Transaction, file: &ImageHandle)
     Ok(())
 }
 
-pub fn remove_tags_from_file(transaction: &Transaction, file: &ImageHandle, tags: &Vec<PantsuTag>) -> Result<(), Error> {
+pub fn remove_tags_from_file(transaction: &Transaction, file: &ImageHandle, tags: &Vec<String>) -> Result<(), Error> {
     let mut remove_tag_stmt = transaction.prepare(sqlite_statements::DELETE_TAG_FROM_FILE)?;
     for tag in tags {
-        remove_tag_stmt.execute([file.get_filename(), tag.tag_name.as_str()])?;
+        remove_tag_stmt.execute([file.get_filename(), tag.as_str()])?;
     }
     Ok(())
 }

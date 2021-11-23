@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 use directories::ProjectDirs;
+use regex::Regex;
 
 pub mod hash;
 pub mod import;
@@ -15,12 +16,33 @@ pub fn get_data_dir() -> PathBuf {
     }
 }
 
+pub fn filename_is_valid(name: &str) -> bool {
+    let regex = Regex::new(r"^[[:xdigit:]]{16}-[[:xdigit:]]{36}\.[^.]+$").unwrap();
+    regex.is_match(name.trim())
+}
+
 #[cfg(test)]
 mod tests {
     use std::io::Cursor;
     use std::path::PathBuf;
     use crate::file_handler::hash::calculate_filename;
-    use crate::file_handler::import;
+    use crate::file_handler::{filename_is_valid, import};
+
+    #[test]
+    fn test_regex() {
+        let name1 = "217c401223d83fae-e0ff0f00de0fcc6cc2ff1f40f00e60e70e74.png";
+        let name2 = "0217c401223d83fae-e0ff0f00de0fcc6cc2ff1f40f00e60e70e74.png";
+        let name2_5 = "217c401223d83fae--e0ff0f00de0fcc6cc2ff1f40f00e60e70e74.png";
+        let name3 = "/home/217c401223d83fae-e0ff0f00de0fcc6cc2ff1f40f00e60e70e74.png";
+        let name4 = "217c401223d83fae-e0ff0f00de0fcc6cc2ff1f40f00e60e70e74.png ";
+        let name5 = " 217c401223d83fae-e0ff0f00de0fcc6cc2ff1f40f00e60e70e74.pngdd";
+        assert!(filename_is_valid(name1));
+        assert!(!filename_is_valid(name2));
+        assert!(!filename_is_valid(name2_5));
+        assert!(!filename_is_valid(name3));
+        assert!(filename_is_valid(name4));
+        assert!(filename_is_valid(name5));
+    }
 
     #[test]
     fn test_hash() {
