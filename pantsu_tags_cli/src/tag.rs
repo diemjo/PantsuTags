@@ -34,6 +34,6 @@ fn tag_add(_tags: Vec<PantsuTag>, image: String) -> AppResult<()> {
 }
 
 fn tag_rm(_tags: Vec<String>, _image: String) -> AppResult<()> {
-    let db = PantsuDB::new(Path::new("./pantsu_tags.db"))?;
+    let _db = PantsuDB::new(Path::new("./pantsu_tags.db"))?;
     Ok(())
 }
