@@ -1,4 +1,5 @@
 use pantsu_tags::{Error, SauceMatch};
+use pantsu_tags::ImageHandle;
 
 pub type AppResult<T> = std::result::Result<T, AppError>;
 
@@ -8,7 +9,7 @@ pub enum AppError {
     NoRelevantSauces,
 
     #[error("Not sure whether sauce is correct or not")]
-    SauceUnsure(Vec<SauceMatch>),
+    SauceUnsure(ImageHandle, Vec<SauceMatch>),
 
     #[error("Failed to read from stdin")]
     StdinReadError(#[source]std::io::Error),

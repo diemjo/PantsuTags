@@ -4,6 +4,7 @@ use rusqlite::types::{FromSql, FromSqlResult, ToSqlOutput, ValueRef};
 use crate::common::image_handle::Sauce::Match;
 use crate::Sauce::{NonExistent, NotChecked};
 
+
 #[derive(Debug, PartialEq)]
 pub struct ImageHandle {
     filename: String,

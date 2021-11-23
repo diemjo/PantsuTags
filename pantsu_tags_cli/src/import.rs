@@ -2,7 +2,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 use colored::Colorize;
 use pantsu_tags::db::PantsuDB;
-use pantsu_tags::{Error, get_thumbnail_link, Sauce, SauceMatch};
+use pantsu_tags::{Error, get_thumbnail_link, ImageHandle, Sauce, SauceMatch};
 use crate::common::{AppError, AppResult};
 use crate::feh;
 use crate::feh::FehProcesses;
@@ -61,10 +61,11 @@ pub fn import(no_auto_sources: bool, no_feh: bool, images: Vec<PathBuf>) -> AppR
                 import_stats.no_source += 1;
                 println!("{} - {}", "No source found            ".red(), image_name);
             },
-            Err(AppError::SauceUnsure(sauce_matches)) => {
+            Err(AppError::SauceUnsure(image_handle, sauce_matches)) => {
                 import_stats.source_unsure += 1;
                 unsure_source_images.push(SauceUnsure {
                     path: &image,
+                    image_handle,
                     matches: sauce_matches,
                 });
                 println!("{} - {}", "Source could be wrong      ".yellow(), image_name);
@@ -96,11 +97,13 @@ fn import_one_image_auto_source(pdb: &mut PantsuDB, image: &PathBuf) -> AppResul
                 let tags = pantsu_tags::get_sauce_tags(sauce)?;
                 pantsu_tags::store_image_with_tags(pdb, &image_handle, Sauce::Match(sauce.link.clone()), &tags)?;
             }
-            else {
-                return Err(AppError::SauceUnsure(relevant_sauces));
+            else { // store image without tags for now, tags can be added in the sauce resolution
+                pantsu_tags::store_image_with_tags(pdb, &image_handle, Sauce::NotChecked, &Vec::new());
+                return Err(AppError::SauceUnsure(image_handle, relevant_sauces));
             }
         }
-        None => {
+        None => { // store image without tags
+            pantsu_tags::store_image_with_tags(pdb, &image_handle, Sauce::NonExistent, &Vec::new());
             return Err(AppError::NoRelevantSauces);
         }
     }
@@ -142,8 +145,8 @@ fn resolve_sauce_unsure(pdb: &mut PantsuDB, images_to_resolve: &Vec<SauceUnsure>
                 }
                 let correct_sauce = &image.matches[num];
                 let tags = pantsu_tags::get_sauce_tags(correct_sauce)?;
-                let image_handle = pantsu_tags::new_image_handle(pdb, &image.path, false)?; // at this point, if there is a similar image it's approved by the user
-                pantsu_tags::store_image_with_tags(pdb, &image_handle, Sauce::Match(correct_sauce.link.clone()), &tags)?;
+                pantsu_tags::store_image_with_tags(pdb, &image.image_handle, Sauce::Match(correct_sauce.link.clone()), &tags)?;
+                // todo: update image sauce
                 println!("{}", "Successfully added tags to image".green());
                 break;
             }
@@ -167,6 +170,7 @@ fn resolve_sauce_unsure(pdb: &mut PantsuDB, images_to_resolve: &Vec<SauceUnsure>
 
 struct SauceUnsure<'a> {
     pub path: &'a Path,
+    pub image_handle: ImageHandle,
     pub matches: Vec<SauceMatch>,
 }
 
