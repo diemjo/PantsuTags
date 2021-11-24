@@ -8,6 +8,7 @@ mod get;
 mod import;
 mod tag;
 mod feh;
+mod stdin_thread;
 
 
 fn main() -> Result<(), AppError> {

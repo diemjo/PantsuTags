@@ -1,11 +1,17 @@
-use std::io;
+use std::{io, thread};
+use std::io::{BufRead, BufReader, Stdin};
 use std::path::{Path, PathBuf};
+use std::process::ChildStdout;
+use std::sync::{Arc, mpsc};
+use std::sync::mpsc::Receiver;
+use std::thread::JoinHandle;
 use colored::Colorize;
 use pantsu_tags::db::PantsuDB;
 use pantsu_tags::{Error, get_thumbnail_link, ImageHandle, Sauce, SauceMatch};
 use crate::common::{AppError, AppResult};
 use crate::feh;
 use crate::feh::FehProcesses;
+use crate::stdin_thread::StdinThread;
 
 // sauce matches with a higher similarity will be automatically accepted
 const FOUND_SIMILARITY_THRESHOLD: i32 = 90;
@@ -119,8 +125,6 @@ fn resolve_sauce_unsure(pdb: &mut PantsuDB, images_to_resolve: Vec<SauceUnsure>,
         return Ok(());
     }
     let use_feh = !no_feh && feh::feh_available();
-    let mut input = String::new();
-    let stdin = io::stdin();
     println!("\n\nResolving {} images with unsure sources manually:", images_to_resolve.len());
     for image in images_to_resolve {
         let image_name = image.path.to_str().unwrap_or("(can't display image name)");
@@ -134,8 +138,9 @@ fn resolve_sauce_unsure(pdb: &mut PantsuDB, images_to_resolve: Vec<SauceUnsure>,
         loop {
             println!("If one of the sources is correct, enter the corresponding number.");
             println!("Enter 'n' if there is no match, or 's' to skip all remaining images.");
-            input.clear();
-            stdin.read_line(&mut input).or_else(|e| Err(AppError::StdinReadError(e)))?;
+
+            //stdin.read_line(&mut input).or_else(|e| Err(AppError::StdinReadError(e)))?;
+            let input = read_input(&mut thumbnails)?;
             let input = input.trim();
             if let Ok(num) = input.parse::<usize>() {
                 if num >= image.matches.len() {
@@ -166,23 +171,71 @@ fn resolve_sauce_unsure(pdb: &mut PantsuDB, images_to_resolve: Vec<SauceUnsure>,
     Ok(())
 }
 
+fn read_input(thumbnails: &mut ThumbnailDisplayer) -> AppResult<String>{
+    let stdin = io::stdin();
+    let feh_reader = thumbnails.take_feh_reader();
+    if let None = feh_reader {
+        let mut input = String::new();
+        stdin.read_line(&mut input).or_else(|e| Err(AppError::StdinReadError(e)))?;
+        return Ok(input)
+    }
+    let mut feh_reader = feh_reader.unwrap();
+    let mut input = String::new();
+    let res = match feh_reader.read_line(&mut input) {
+        Ok(_) => {
+            println!("got: {}", &input);
+            Ok(input)
+        },
+        Err(e) => Err(AppError::StdinReadError(e)),
+    };
+    thumbnails.give_feh_reader(feh_reader);
+
+    res
+    /*let mut feh_reader1 = Arc::new(feh_reader.unwrap());
+    let mut feh_reader2 = feh_reader1.clone();
+
+    let (tx1, rx) = mpsc::channel();
+    let tx2 = tx1.clone();
+    let thread1 = thread::spawn(move || {
+        let mut input = String::new();
+        let res = match stdin.read_line(&mut input) {
+            Ok(_) => Ok(input),
+            Err(e) => Err(AppError::StdinReadError(e)),
+        };
+        let _ = tx1.send(res);
+    });
+    let thread2 = thread::spawn(move || {
+        let mut input = String::new();
+        let res = match feh_reader2.read_line(&mut input) {
+            Ok(_) => Ok(input),
+            Err(e) => Err(AppError::StdinReadError(e)),
+        };
+        let _ = tx2.send(res);
+    });
+
+    let res = rx.recv().map_err(|_| AppError::NoRelevantSauces); // todo: replace error
+    thread1.*/
+}
+
 struct SauceUnsure<'a> {
     pub path: &'a Path,
     pub image_handle: ImageHandle,
     pub matches: Vec<SauceMatch>,
 }
 
-struct ThumbnailDisplayer {
+struct ThumbnailDisplayer<'a> {
     thumbnail_links: Vec<String>,
     enabled: bool,
     feh_processes: Option<FehProcesses>,
+    input_threads_rx: Option<&'a Receiver<AppResult<String>>>,
 }
-impl ThumbnailDisplayer {
+impl <'a> ThumbnailDisplayer {
     fn new(enable: bool) -> Self {
         ThumbnailDisplayer {
             thumbnail_links: Vec::new(),
             enabled: enable,
             feh_processes: None,
+            input_threads_rx: None,
         }
     }
 
@@ -211,6 +264,52 @@ impl ThumbnailDisplayer {
             "Original",
             "Potential Source"
         ));
+    }
+
+    fn read_input(&mut self, stdin: &mut StdinThread) -> AppResult<String> {
+        if let None = self.feh_processes {
+            stdin.read_line()
+        }
+
+        if self.input_threads_rx.is_none() {
+            self.launch_feh_input_thread(stdin);
+        }
+
+        self.input_threads_rx.recv().map_err(|_| AppError::NoRelevantSauces) // todo: replace error
+    }
+
+    fn launch_feh_input_thread(&mut self, stdin: &mut StdinThread) -> &Receiver<AppResult<String>> {
+        let (tx, rx) = stdin.get_tx_rx_ref();
+        let feh_reader = self.take_feh_reader();
+        if let None = feh_reader {
+            return rx
+        }
+        let feh_reader = feh_reader.unwrap();
+        let thread = thread::spawn(move || {
+            loop {
+                let mut input = String::new();
+                let res = match feh_reader.read_line(&mut input) {
+                    Ok(_) => Ok(input),
+                    Err(e) => Err(AppError::StdinReadError(e)),
+                };
+                let _ = tx.send(res);
+            }
+        });
+
+        rx
+    }
+
+    fn take_feh_reader(&mut self) -> Option<BufReader<ChildStdout>> {
+        if let Some(procs) = &mut self.feh_processes {
+            return procs.take_reader();
+        }
+        None
+    }
+
+    fn give_feh_reader(&mut self, reader: BufReader<ChildStdout>) {
+        if let Some(procs) = &mut self.feh_processes {
+            procs.give_reader(reader)
+        }
     }
 
     fn kill_feh(&mut self) {
