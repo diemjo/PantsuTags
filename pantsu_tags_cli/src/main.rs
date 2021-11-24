@@ -8,6 +8,7 @@ mod get;
 mod import;
 mod tag;
 mod feh;
+mod autotags;
 
 
 fn main() -> Result<(), AppError> {
