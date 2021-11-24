@@ -1,11 +1,10 @@
 use std::io::ErrorKind::AlreadyExists;
 use std::path::{Path, PathBuf};
+
 use crate::common::error;
+use crate::common::error::{Error, Result};
 
-use crate::common::error::Error;
-use crate::{ImageHandle, Sauce};
-
-pub fn import_file(lib: &str, file: &Path, new_filename: &str) -> Result<ImageHandle, Error> {
+pub fn import_file(lib: &str, file: &Path, new_filename: &str) -> Result<()> {
     let lib_path = PathBuf::from(lib);
     std::fs::create_dir_all(&lib_path).or_else(|err|
         Err(Error::DirectoryCreateError(err, String::from(lib)))
@@ -20,5 +19,5 @@ pub fn import_file(lib: &str, file: &Path, new_filename: &str) -> Result<ImageHa
             Err(Error::HardLinkError(err, error::get_path(file)))
         }
     })?;
-    Ok(ImageHandle::new(String::from(new_filename), Sauce::NotChecked))
+    Ok(())
 }

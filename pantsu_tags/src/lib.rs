@@ -17,20 +17,23 @@ pub mod db;
 pub mod file_handler;
 
 pub fn new_image_handle(pantsu_db: &mut PantsuDB, image_path: &Path, error_on_similar: bool) -> Result<ImageHandle> {
-    let image_name = file_handler::hash::calculate_filename(image_path)?;
+    let image_info = file_handler::hash::calculate_fileinfo(image_path)?;
 
-    if pantsu_db.get_file(&image_name)?.is_some() {
+    let image_name = image_info.filename;
+    let image_res = image_info.file_res;
+    if pantsu_db.get_file(image_name.as_str())?.is_some() {
         return Err(Error::ImageAlreadyExists(error::get_path(image_path)));
     }
 
     if error_on_similar {
         let similar = get_similar_images(&pantsu_db, &image_name, 10)?;
         if similar.len()>0 {
-            return Err(Error::SimilarImagesExist(image_name, similar))
+            return Err(Error::SimilarImagesExist(String::from(image_name), similar))
         }
     }
 
-    let file_handle = import::import_file("./test_image_lib/", image_path, &image_name)?;
+    import::import_file("./test_image_lib/", image_path, &image_name)?;
+    let file_handle = ImageHandle::new(image_name, Sauce::NonExistent, image_res);
     pantsu_db.add_file_with_source(&file_handle)?;
     Ok(file_handle)
 }
@@ -47,7 +50,7 @@ pub fn get_sauce_tags(sauce: &SauceMatch) -> Result<Vec<PantsuTag>> {
     sauce::find_tags_gelbooru(&sauce.link)
 }
 
-fn get_similar_images(pantsu_db: &PantsuDB, file_name: &String, min_dist: u32) -> Result<Vec<String>> {
+fn get_similar_images(pantsu_db: &PantsuDB, file_name: &str, min_dist: u32) -> Result<Vec<String>> {
     let files = pantsu_db.get_all_files()?;
     file_handler::hash::get_similarity_distances(file_name, files, min_dist)
 }

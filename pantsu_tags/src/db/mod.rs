@@ -74,7 +74,7 @@ impl PantsuDB {
     pub fn update_file_source(&mut self, file: ImageHandle, sauce: Sauce) -> Result<ImageHandle, Error> {
         let transaction = self.conn.transaction()?;
 
-        let new_handle = ImageHandle::new(String::from(file.get_filename()), sauce);
+        let new_handle = ImageHandle::new(String::from(file.get_filename()), sauce, file.get_res());
         db_calls::update_file_source(&transaction, &new_handle)?;
 
         transaction.commit()?;
@@ -117,7 +117,7 @@ impl PantsuDB {
     pub fn update_file_sauce_with_tags(&mut self, file: ImageHandle, sauce: Sauce, tags: &Vec<PantsuTag>) -> Result<ImageHandle, Error> {
         let transaction = self.conn.transaction()?;
 
-        let new_handle = ImageHandle::new(String::from(file.get_filename()), sauce);
+        let new_handle = ImageHandle::new(String::from(file.get_filename()), sauce, file.get_res());
 
         db_calls::update_file_source(&transaction, &new_handle)?;
         db_calls::add_tags_to_tag_list(&transaction, tags)?;
@@ -363,10 +363,10 @@ mod tests {
     }
 
     fn get_test_image() -> ImageHandle {
-        ImageHandle::new(String::from("test_image_1db8ab6c94e95f36a9dd5bde347f6dd1.png"), Sauce::NotChecked)
+        ImageHandle::new(String::from("test_image_1db8ab6c94e95f36a9dd5bde347f6dd1.png"), Sauce::NotChecked, (0, 0))
     }
 
     fn get_test_image2() -> ImageHandle {
-        ImageHandle::new(String::from("test_image_4f76b8d52983af1d28b1bf8d830d684e.png"), Match(String::from("http://real.url")) )
+        ImageHandle::new(String::from("test_image_4f76b8d52983af1d28b1bf8d830d684e.png"), Match(String::from("http://real.url")), (0, 0))
     }
 }

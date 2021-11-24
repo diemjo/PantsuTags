@@ -1,18 +1,19 @@
 use std::path::Path;
 use std::str::FromStr;
 use blockhash::{Blockhash144, Image};
-use image::{DynamicImage, GenericImageView, ImageError};
+use image::{DynamicImage, GenericImageView};
 use lz_fnv::{Fnv1a, FnvHasher};
 use crate::common::error;
 use crate::common::error::Result;
 use crate::common::error::Error;
+use crate::file_handler::ImageInfo;
 use crate::ImageHandle;
 
-struct AdapterImage {
-    pub image: DynamicImage,
+struct AdapterImage<'a> {
+    pub image: &'a DynamicImage,
 }
 
-impl Image for AdapterImage {
+impl<'a> Image for AdapterImage<'a> {
     fn dimensions(&self) -> (u32, u32) {
         self.image.dimensions()
     }
@@ -22,21 +23,25 @@ impl Image for AdapterImage {
     }
 }
 
-pub fn calculate_filename(path: &Path) -> Result<String> {
+pub(crate) fn calculate_fileinfo(path: &Path) -> Result<ImageInfo> {
     let file_content = std::fs::read(&path).or_else(|_|
         Err(Error::ImageLoadError(error::get_path(&path)))
     )?;
     let file_extension = get_file_extension(&path)?;
 
-    let fnv1a_hash = get_fnv1a_hash(&file_content);
-    let perceptual_hash = get_perceptual_hash(&file_content).or_else(|_|
+    let image = image::load_from_memory(&file_content).or_else(|_|
         Err(Error::ImageLoadError(error::get_path(&path)))
     )?;
+    let fnv1a_hash = get_fnv1a_hash(&file_content);
+    let perceptual_hash = get_perceptual_hash(&image);
 
-    Ok(format!("{}-{}.{}", fnv1a_hash, perceptual_hash, file_extension))
+    Ok(ImageInfo {
+        filename: format!("{}-{}.{}", fnv1a_hash, perceptual_hash, file_extension),
+        file_res: image.dimensions()
+    })
 }
 
-pub fn get_similarity_distances(filename: &String, files: Vec<ImageHandle>, min_dist: u32) -> Result<Vec<String>> {
+pub fn get_similarity_distances(filename: &str, files: Vec<ImageHandle>, min_dist: u32) -> Result<Vec<String>> {
     let file_hash = extract_hash(filename)?;
     Ok(files.into_iter()
         .filter(|file|{
@@ -52,7 +57,7 @@ pub fn get_similarity_distances(filename: &String, files: Vec<ImageHandle>, min_
 
 fn extract_hash(filename: &str) -> Result<Blockhash144> {
     let filename = filename.trim();
-    if super::filename_is_valid(filename) {
+    if !super::filename_is_valid(filename) {
         return Err(Error::InvalidFilename(String::from(filename)))
     }
     // 0-15=fnv_hash, 16='-', 17-52=p_hash, 53='.', 54+=extension
@@ -66,10 +71,9 @@ fn get_fnv1a_hash(bytes: &Vec<u8>) -> String {
     format!("{:016x}", fnv.finish())
 }
 
-fn get_perceptual_hash(bytes: &[u8]) -> std::result::Result<String, ImageError> {
-    let image = image::load_from_memory(bytes)?;
+fn get_perceptual_hash(image: &DynamicImage) -> String {
     let hash = blockhash::blockhash144(&AdapterImage { image });
-    Ok(hash.to_string())
+    hash.to_string()
 }
 
 fn get_file_extension(path: &Path) -> Result<String> {

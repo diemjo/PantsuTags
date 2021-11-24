@@ -8,14 +8,16 @@ use crate::Sauce::{NonExistent, NotChecked};
 #[derive(Debug, PartialEq)]
 pub struct ImageHandle {
     filename: String,
-    file_source: Sauce
+    file_source: Sauce,
+    file_res: (u32, u32)
 }
 
 impl ImageHandle {
-    pub(crate) fn new(filename: String, file_source: Sauce) -> ImageHandle {
+    pub(crate) fn new(filename: String, file_source: Sauce, file_res: (u32, u32)) -> ImageHandle {
         ImageHandle {
             filename,
-            file_source
+            file_source,
+            file_res
         }
     }
 
@@ -25,6 +27,10 @@ impl ImageHandle {
 
     pub fn get_sauce(&self) -> &Sauce {
         &self.file_source
+    }
+
+    pub fn get_res(&self) -> (u32, u32) {
+        self.file_res
     }
 }
 
