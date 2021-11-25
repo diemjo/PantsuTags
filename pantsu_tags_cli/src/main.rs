@@ -17,8 +17,8 @@ fn main() -> Result<(), AppError> {
     let res = match args {
         Args::Image(args) => {
             match args {
-                ImageArgs::Import { no_auto_sources, no_feh, images } => {
-                    import::import(no_auto_sources, no_feh, images)
+                ImageArgs::Import { no_feh, images } => {
+                    import::import(no_feh, images)
                 },
                 ImageArgs::AddTags { tags, image } => {
                     tag::tag_add(tags, image)
@@ -26,6 +26,9 @@ fn main() -> Result<(), AppError> {
                 ImageArgs::RmTags { tags, image } => {
                     tag::tag_rm(tags, image)
                 },
+                ImageArgs::AutoAddTags { no_feh, images} => {
+                    autotags::auto_add_tags(images, no_feh)
+                }
                 ImageArgs::GetTags { images } => {
                     tag::tag_get(images)
                 }

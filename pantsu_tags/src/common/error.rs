@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use reqwest::StatusCode;
 
 pub fn get_path(path: &Path) -> String {
@@ -33,7 +33,7 @@ pub enum Error {
     InvalidTagFormat(String),
 
     #[error("Similar images to '{0}' already exist in database: '{1:?}'")]
-    SimilarImagesExist(String, Vec<String>),
+    SimilarImagesExist(PathBuf, Vec<String>), // Path is the path to the new images before inserting it in the db
 
     #[error("Failed to add image {0}: Image already exists")]
     ImageAlreadyExists(String),

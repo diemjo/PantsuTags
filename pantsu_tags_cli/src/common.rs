@@ -11,6 +11,9 @@ pub enum AppError {
     #[error("Not sure whether sauce is correct or not")]
     SauceUnsure(ImageHandle, Vec<SauceMatch>),
 
+    #[error("Image not found in PantsuTags: {0}")]
+    ImageNotFound(String),
+
     #[error("Failed to read from stdin")]
     StdinReadError(#[source]std::io::Error),
 

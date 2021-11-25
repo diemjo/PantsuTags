@@ -2,6 +2,7 @@ use std::fmt::Debug;
 use rusqlite::ToSql;
 use rusqlite::types::{FromSql, FromSqlResult, ToSqlOutput, ValueRef};
 use crate::common::image_handle::Sauce::Match;
+use crate::LIB_PATH;
 use crate::Sauce::{NonExistent, NotChecked};
 
 
@@ -24,6 +25,8 @@ impl ImageHandle {
     pub fn get_filename(&self) -> &str {
         self.filename.as_str()
     }
+
+    pub fn get_path(&self) -> String { format!("{}{}", LIB_PATH, self.filename.as_str()) }
 
     pub fn get_sauce(&self) -> &Sauce {
         &self.file_source

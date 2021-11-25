@@ -16,6 +16,8 @@ mod common;
 pub mod db;
 pub mod file_handler;
 
+pub const LIB_PATH: &str = "./test_image_lib/";
+
 pub fn new_image_handle(pantsu_db: &mut PantsuDB, image_path: &Path, error_on_similar: bool) -> Result<ImageHandle> {
     let image_info = file_handler::hash::calculate_fileinfo(image_path)?;
 
@@ -28,11 +30,11 @@ pub fn new_image_handle(pantsu_db: &mut PantsuDB, image_path: &Path, error_on_si
     if error_on_similar {
         let similar = get_similar_images(&pantsu_db, &image_name, 10)?;
         if similar.len()>0 {
-            return Err(Error::SimilarImagesExist(String::from(image_name), similar))
+            return Err(Error::SimilarImagesExist(PathBuf::from(image_path), similar))
         }
     }
 
-    import::import_file("./test_image_lib/", image_path, &image_name)?;
+    import::import_file(LIB_PATH, image_path, &image_name)?;
     let file_handle = ImageHandle::new(image_name, Sauce::NonExistent, image_res);
     pantsu_db.add_file_with_source(&file_handle)?;
     Ok(file_handle)

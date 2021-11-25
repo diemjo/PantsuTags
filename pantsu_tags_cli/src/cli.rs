@@ -13,9 +13,6 @@ pub enum Args {
 pub enum ImageArgs {
     Import {
         #[structopt(long)]
-        no_auto_sources: bool,
-
-        #[structopt(long)]
         no_feh: bool,
 
         #[structopt(parse(from_os_str))]
@@ -39,6 +36,13 @@ pub enum ImageArgs {
         #[structopt(about = "The image to remove tags from")]
         #[structopt(short, long, parse(from_str))]
         image: String
+    },
+    AutoAddTags {
+        #[structopt(long)]
+        no_feh: bool,
+
+        #[structopt(parse(from_os_str))]
+        images: Vec<PathBuf>,
     },
     GetTags {
         #[structopt(about = "The image to retrieve tags for")]
