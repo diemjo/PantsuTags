@@ -48,12 +48,8 @@ pub fn auto_add_tags(images: Vec<PathBuf>, no_feh: bool) -> AppResult<()> {
     }
 
     resolve_sauce_unsure(&mut pdb, unsure_source_images, &mut stats, no_feh)?;
-
-    println!("Successfully tagged: {}", stats.success);
-    println!("Source not found:    {}", stats.no_source);
-    if stats.not_found != 0 {
-        println!("Image not found:     {}", stats.not_found);
-    }
+    println!();
+    stats.print_stats();
     Ok(())
 }
 
@@ -69,6 +65,7 @@ fn auto_add_tags_one_image(pdb: &mut PantsuDB, image_path: &str) -> AppResult<()
                 pdb.update_file_sauce_with_tags(image_handle, Sauce::Match(sauce.link.clone()), &tags)?;
             }
             else { // tags can be added in the sauce resolution
+                // todo: maybe add Sauce::NotChecked
                 return Err(AppError::SauceUnsure(image_handle, relevant_sauces));
             }
         }
@@ -140,6 +137,19 @@ struct AutoTaggingStats {
     success: u64,
     no_source: u64,
     not_found: u64,
+}
+impl AutoTaggingStats {
+    fn print_stats(&self) {
+        if self.success > 0 {
+            println!("Successfully tagged: {}", self.success);
+        }
+        if self.no_source > 0 {
+            println!("Source not found:    {}", self.no_source);
+        }
+        if self.not_found > 0 {
+            println!("Image not found:     {}", self.not_found);
+        }
+    }
 }
 
 struct SauceUnsure {
