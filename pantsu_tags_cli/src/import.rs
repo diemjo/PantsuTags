@@ -2,8 +2,10 @@ use std::io;
 use std::path::{Path, PathBuf};
 use colored::Colorize;
 use pantsu_tags::db::PantsuDB;
-use pantsu_tags::Error;
+use pantsu_tags::{Error, ImageHandle};
 use crate::common::{AppError, AppResult};
+use crate::feh;
+use crate::feh::FehProcesses;
 
 pub fn import(no_feh: bool, images: Vec<PathBuf>) -> AppResult<()> {
     let mut import_stats = ImportStats::default();
@@ -46,19 +48,17 @@ fn resolve_similar_images(pdb: &mut PantsuDB, images_to_resolve: Vec<SimilarImag
     if images_to_resolve.is_empty() {
         return Ok(());
     }
-    //let use_feh = !no_feh && feh::feh_available();
+    let use_feh = !no_feh && feh::feh_available();
     let mut input = String::new();
     let stdin = io::stdin();
     println!("\n\nResolving {} images which are similar to images in PantsuTags:", images_to_resolve.len());
-    for case in images_to_resolve {
+    for case in &images_to_resolve {
         let image_name = case.new_image_path.to_str().unwrap_or("(can't display image name)");
-        //let mut thumbnails = ThumbnailDisplayer::new(use_feh);
         println!("\nImage {} is similar to", image_name);
-        for similar_img in case.similar_images {
-            //thumbnails.add_thumbnail_link(similar_img);
-            println!(" - {}", similar_img);
+        for similar_img in &case.similar_images {
+            println!(" - {}", similar_img.get_filename());
         }
-        //thumbnails.feh_display(image_name);
+        let procs = feh_display_similar(image_name, &case.similar_images, use_feh);
         println!("Do you still want to add the new image to PantsuTags?");
         println!("[y/N]");
         input.clear();
@@ -79,9 +79,23 @@ fn resolve_similar_images(pdb: &mut PantsuDB, images_to_resolve: Vec<SimilarImag
             stats.similar_not_imported += 1;
             println!("New image {} imported", "was not".bold());
         }
-        //thumbnails.kill_feh();
+        procs.kill();
     }
     Ok(())
+}
+
+fn feh_display_similar(image_path: &str, similar_images: &Vec<ImageHandle>, use_feh: bool) -> FehProcesses {
+    if use_feh {
+        let similar_images: Vec<String> = similar_images.iter().map(|img| img.get_path()).collect();
+        let similar_images = similar_images.iter().map(|path| path.as_str()).collect();
+        return feh::feh_compare_image(
+            image_path,
+            &similar_images,
+            "New image",
+            "Similar image already stored in PantsuTags"
+        );
+    }
+    FehProcesses::new_empty()
 }
 
 #[derive(Default)]
@@ -118,5 +132,5 @@ impl ImportStats {
 
 struct SimilarImagesExistCase {
     new_image_path: PathBuf,
-    similar_images: Vec<String>,
+    similar_images: Vec<ImageHandle>,
 }
