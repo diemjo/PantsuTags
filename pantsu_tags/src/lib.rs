@@ -3,11 +3,13 @@ use crate::common::error;
 use crate::db::PantsuDB;
 use crate::file_handler::import;
 
+pub use crate::common::ImageRatio;
 pub use crate::common::error::Error;
 pub use crate::common::error::Result;
 pub use crate::common::image_handle::ImageHandle;
 pub use crate::common::image_handle::Sauce;
 pub use crate::common::pantsu_tag::{PantsuTag, PantsuTagType};
+use crate::db::transactions::{AddImageTransaction, GetImagesTransaction, GetImageTransaction};
 pub use crate::sauce::SauceMatch;
 pub use crate::sauce::get_thumbnail_link;
 
@@ -21,12 +23,12 @@ pub fn new_image_handle(pantsu_db: &mut PantsuDB, image_path: &Path, error_on_si
 
     let image_name = image_info.filename;
     let image_res = image_info.file_res;
-    if pantsu_db.get_file(image_name.as_str())?.is_some() {
+    if pantsu_db.execute(GetImageTransaction::new(image_name.as_str()))?.is_some() {
         return Err(Error::ImageAlreadyExists(error::get_path(image_path)));
     }
 
     if error_on_similar {
-        let similar = get_similar_images(&pantsu_db, &image_name, 10)?;
+        let similar = get_similar_images(pantsu_db, &image_name, 10)?;
         if similar.len()>0 {
             return Err(Error::SimilarImagesExist(String::from(image_name), similar))
         }
@@ -34,7 +36,7 @@ pub fn new_image_handle(pantsu_db: &mut PantsuDB, image_path: &Path, error_on_si
 
     import::import_file("./test_image_lib/", image_path, &image_name)?;
     let file_handle = ImageHandle::new(image_name, Sauce::NonExistent, image_res);
-    pantsu_db.add_file_with_source(&file_handle)?;
+    pantsu_db.execute(AddImageTransaction::new(&file_handle))?;
     Ok(file_handle)
 }
 
@@ -50,8 +52,8 @@ pub fn get_sauce_tags(sauce: &SauceMatch) -> Result<Vec<PantsuTag>> {
     sauce::find_tags_gelbooru(&sauce.link)
 }
 
-fn get_similar_images(pantsu_db: &PantsuDB, file_name: &str, min_dist: u32) -> Result<Vec<String>> {
-    let files = pantsu_db.get_all_files()?;
+fn get_similar_images(pantsu_db: &mut PantsuDB, file_name: &str, min_dist: u32) -> Result<Vec<String>> {
+    let files = pantsu_db.execute(GetImagesTransaction::new())?;
     file_handler::hash::get_similarity_distances(file_name, files, min_dist)
 }
 

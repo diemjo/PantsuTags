@@ -23,6 +23,9 @@ pub enum Error {
     #[error("Primary key constraint error: {0}")]
     SQLPrimaryKeyError(#[source] rusqlite::Error),
 
+    #[error("At least one tag must be provided to the database query")]
+    NoTagProvided,
+
     #[error("Failed underlying SQLite call: {0}")]
     SQLError(#[from] rusqlite::Error),
 

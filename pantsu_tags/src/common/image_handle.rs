@@ -21,6 +21,10 @@ impl ImageHandle {
         }
     }
 
+    pub(crate) fn clone_with_sauce(&self, sauce: Sauce) -> Self {
+        ImageHandle::new(self.filename.clone(), sauce, self.file_res)
+    }
+
     pub fn get_filename(&self) -> &str {
         self.filename.as_str()
     }

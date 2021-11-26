@@ -1,14 +1,14 @@
 use std::path::{Path, PathBuf};
 use rusqlite::{Connection};
 use crate::common::error;
-use crate::common::error::Error;
-use crate::common::image_handle::ImageHandle;
-use crate::common::pantsu_tag::{PantsuTag, PantsuTagType};
-use crate::{file_handler, Sauce};
+use crate::common::error::{Error, Result};
+use crate::{file_handler};
+use crate::db::transactions::PantsuDBTransaction;
 
 mod db_calls;
 mod sqlite_statements;
 mod db_init;
+pub mod transactions;
 
 pub struct PantsuDB {
     conn: Connection
@@ -16,13 +16,13 @@ pub struct PantsuDB {
 
 impl PantsuDB {
 
-    pub fn default() -> Result<PantsuDB, Error> {
+    pub fn default() -> Result<PantsuDB> {
         let mut data_dir = file_handler::get_data_dir();
         data_dir.push("pantsu_tags.db");
         PantsuDB::new(&data_dir)
     }
 
-    pub fn new(db_path: &Path) -> Result<PantsuDB, Error> {
+    pub fn new(db_path: &Path) -> Result<PantsuDB> {
         if db_path.eq(Path::new("/")) {
             return Err(Error::InvalidDatabasePath(error::get_path(db_path)));
         }
@@ -35,7 +35,7 @@ impl PantsuDB {
     }
 
     // WARNING: ALL DATA WILL BE LOST
-    pub fn clear(&mut self) -> Result<(), Error> {
+    pub fn clear(&mut self) -> Result<()> {
         let transaction = self.conn.transaction()?;
 
         db_calls::clear_all_file_tags(&transaction)?;
@@ -46,108 +46,11 @@ impl PantsuDB {
         Ok(())
     }
 
-    // file
-    pub fn add_file_with_source(&mut self, file: &ImageHandle) -> Result<(), Error> {
-        if !file_handler::filename_is_valid(file.get_filename()) {
-            return Err(Error::InvalidFilename(String::from(file.get_filename())))
-        }
-
-        let transaction = self.conn.transaction()?;
-
-        db_calls::add_file_to_file_list(&transaction, file)?;
-
+    pub fn execute<R, T: PantsuDBTransaction<R>>(&mut self, pantsu_transaction: T) -> Result<R> {
+        let mut transaction = self.conn.transaction()?;
+        let res = pantsu_transaction.execute(&mut transaction)?;
         transaction.commit()?;
-        Ok(())
-    }
-
-    pub fn remove_file(&mut self, file: &ImageHandle) -> Result<(), Error> {
-        let transaction = self.conn.transaction()?;
-
-        db_calls::remove_all_tags_from_file(&transaction, file)?;
-        db_calls::remove_file_from_file_list(&transaction, file)?;
-        db_calls::remove_unused_tags(&transaction)?;
-
-        transaction.commit()?;
-        Ok(())
-    }
-
-    pub fn update_file_source(&mut self, file: ImageHandle, sauce: Sauce) -> Result<ImageHandle, Error> {
-        let transaction = self.conn.transaction()?;
-
-        let new_handle = ImageHandle::new(String::from(file.get_filename()), sauce, file.get_res());
-        db_calls::update_file_source(&transaction, &new_handle)?;
-
-        transaction.commit()?;
-        Ok(new_handle)
-    }
-
-    pub fn get_file(&self, filename: &str) -> Result<Option<ImageHandle>, Error> {
-        db_calls::get_file(&self.conn, filename)
-    }
-
-    pub fn get_all_files(&self) -> Result<Vec<ImageHandle>, Error> {
-        db_calls::get_all_files(&self.conn)
-    }
-
-    pub fn get_files_with_tags(&self, included_tags: &Vec<String>) -> Result<Vec<ImageHandle>, Error> {
-        if included_tags.len() == 0 {
-            return self.get_all_files();
-        }
-        db_calls::get_files_with_tags(&self.conn, included_tags, &Vec::<String>::new())
-    }
-
-    pub fn get_files_with_tags_but(&self, included_tags: &Vec<String>, excluded_tags: &Vec<String>) -> Result<Vec<ImageHandle>, Error> {
-        if included_tags.len() == 0 && excluded_tags.len() == 0 {
-            return self.get_all_files();
-        }
-        db_calls::get_files_with_tags(&self.conn, included_tags, excluded_tags)
-    }
-
-    // file->tag
-    pub fn add_tags_to_file(&mut self, file: &ImageHandle, tags: &Vec<PantsuTag>) -> Result<(), Error> {
-        let transaction = self.conn.transaction()?;
-
-        db_calls::add_tags_to_tag_list(&transaction, tags)?;
-        db_calls::add_tags_to_file_tags(&transaction, file, tags)?;
-
-        transaction.commit()?;
-        Ok(())
-    }
-
-    pub fn update_file_sauce_with_tags(&mut self, file: ImageHandle, sauce: Sauce, tags: &Vec<PantsuTag>) -> Result<ImageHandle, Error> {
-        let transaction = self.conn.transaction()?;
-
-        let new_handle = ImageHandle::new(String::from(file.get_filename()), sauce, file.get_res());
-
-        db_calls::update_file_source(&transaction, &new_handle)?;
-        db_calls::add_tags_to_tag_list(&transaction, tags)?;
-        db_calls::add_tags_to_file_tags(&transaction, &new_handle, tags)?;
-
-        transaction.commit()?;
-        Ok(new_handle)
-    }
-
-    pub fn remove_tags(&mut self, file: &ImageHandle, tags: &Vec<String>) -> Result<(), Error> {
-        let transaction = self.conn.transaction()?;
-
-        db_calls::remove_tags_from_file(&transaction, file, tags)?;
-        db_calls::remove_unused_tags(&transaction)?;
-
-        transaction.commit()?;
-        Ok(())
-    }
-
-    pub fn get_tags_for_file(&self, file: &ImageHandle) -> Result<Vec<PantsuTag>, Error> {
-        db_calls::get_tags_for_file(&self.conn, file)
-    }
-
-    // tags
-    pub fn get_all_tags(&self) -> Result<Vec<PantsuTag>, Error> {
-        db_calls::get_all_tags(&self.conn)
-    }
-
-    pub fn get_tags_with_types(&self, types: &Vec<PantsuTagType>) -> Result<Vec<PantsuTag>, Error> {
-        db_calls::get_tags_with_types(&self.conn, types)
+        Ok(res)
     }
 }
 

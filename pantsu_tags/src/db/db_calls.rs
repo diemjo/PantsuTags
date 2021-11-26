@@ -1,4 +1,4 @@
-use rusqlite::{Connection, ffi, params, Transaction};
+use rusqlite::{ffi, params, Transaction};
 use crate::common::error::Result;
 use crate::common::error::Error::{SQLError, SQLPrimaryKeyError};
 use crate::common::image_handle::ImageHandle;
@@ -6,9 +6,9 @@ use crate::common::pantsu_tag::{PantsuTag, PantsuTagType};
 use crate::db::sqlite_statements;
 
 // INSERT
-pub fn add_tags_to_tag_list(transaction: &Transaction, tags: &Vec<PantsuTag>) -> Result<()> {
+pub fn add_tags_to_tag_list(transaction: &Transaction, tags: &Vec<&PantsuTag>) -> Result<()> {
     let mut add_tag_list_stmt = transaction.prepare(sqlite_statements::INSERT_TAG_INTO_TAG_LIST)?;
-    for tag in tags {
+    for &tag in tags {
         add_tag_list_stmt.execute([&tag.tag_name, &tag.tag_type.to_string()])?;
     }
     Ok(())
@@ -27,18 +27,18 @@ pub fn add_file_to_file_list(transaction: &Transaction, file: &ImageHandle) -> R
     }
 }
 
-pub fn add_tags_to_file_tags(transaction: &Transaction, file: &ImageHandle, tags: &Vec<PantsuTag>) -> Result<()> {
+pub fn add_tags_to_file_tags(transaction: &Transaction, file: &ImageHandle, tags: &Vec<&PantsuTag>) -> Result<()> {
     let mut add_tag_stmt = transaction.prepare(sqlite_statements::INSERT_TAG_FOR_FILE)?;
-    for tag in tags {
+    for &tag in tags {
         add_tag_stmt.execute([file.get_filename(), tag.tag_name.as_str()])?;
     }
     Ok(())
 }
 
 // UPDATE
-pub fn update_file_source(transaction: &Transaction, file: &ImageHandle) -> Result<()> {
-    let mut update_file_statement = transaction.prepare(sqlite_statements::UPDATE_FILE)?;
-    update_file_statement.execute(params![file.get_sauce(), file.get_filename()])?;
+pub fn update_file_info(transaction: &Transaction, file: &ImageHandle) -> Result<()> {
+    let mut update_file_statement = transaction.prepare(sqlite_statements::UPDATE_IMAGE)?;
+    update_file_statement.execute(params![file.get_sauce(), file.get_filename(), file.get_res().0, file.get_res().1])?;
     Ok(())
 }
 
@@ -54,10 +54,10 @@ pub fn remove_file_from_file_list(transaction: &Transaction, file: &ImageHandle)
     Ok(())
 }
 
-pub fn remove_tags_from_file(transaction: &Transaction, file: &ImageHandle, tags: &Vec<String>) -> Result<()> {
+pub fn remove_tags_from_file(transaction: &Transaction, file: &ImageHandle, tags: Vec<&str>) -> Result<()> {
     let mut remove_tag_stmt = transaction.prepare(sqlite_statements::DELETE_TAG_FROM_FILE)?;
     for tag in tags {
-        remove_tag_stmt.execute([file.get_filename(), tag.as_str()])?;
+        remove_tag_stmt.execute([file.get_filename(), tag])?;
     }
     Ok(())
 }
@@ -84,17 +84,24 @@ pub fn clear_all_tags(transaction: &Transaction) -> Result<()> {
 }
 
 // SELECT
-pub fn get_file(connection: &Connection, filename: &str) -> Result<Option<ImageHandle>> {
-    let mut stmt = connection.prepare(sqlite_statements::SELECT_FILE)?;
+pub fn get_file(transaction: &Transaction, filename: &str) -> Result<Option<ImageHandle>> {
+    let mut stmt = transaction.prepare(sqlite_statements::SELECT_FILE)?;
     query_helpers::query_row_as_file(&mut stmt, [filename])
 }
 
-pub fn get_all_files(connection: &Connection) -> Result<Vec<ImageHandle>> {
-    let mut stmt = connection.prepare(sqlite_statements::SELECT_ALL_FILES)?;
+pub fn get_all_files(transaction: &Transaction) -> Result<Vec<ImageHandle>> {
+    let mut stmt = transaction.prepare(sqlite_statements::SELECT_ALL_FILES)?;
     query_helpers::query_rows_as_files(&mut stmt, [])
 }
 
-pub fn get_files_with_tags(connection: &Connection, included_tags: &Vec<String>, excluded_tags: &Vec<String>) -> Result<Vec<ImageHandle>> {
+pub fn get_all_files_with_ratio(transaction: &Transaction, ratio_min: f32, ratio_max: f32) -> Result<Vec<ImageHandle>> {
+    let mut stmt = transaction.prepare(&sqlite_statements::SELECT_ALL_FILES_RATIO
+        .replace(sqlite_statements::RATIO_MIN_PLACEHOLDER, ratio_min.to_string().as_str())
+        .replace(sqlite_statements::RATIO_MAX_PLACEHOLDER, ratio_max.to_string().as_str()))?;
+    query_helpers::query_rows_as_files(&mut stmt, [])
+}
+
+pub fn get_files_with_tags(transaction: &Transaction, included_tags: &Vec<&str>, excluded_tags: &Vec<&str>, ratio_min: f32, ratio_max: f32) -> Result<Vec<ImageHandle>> {
     let formatted_stmt =
         if included_tags.len()!=0 && excluded_tags.len()!=0 {
             sqlite_statements::SELECT_FILES_FOR_INCLUDING_AND_EXCLUDING_TAGS
@@ -109,10 +116,13 @@ pub fn get_files_with_tags(connection: &Connection, included_tags: &Vec<String>,
                 .replace(sqlite_statements::SELECT_FILES_FOR_INCLUDING_TAGS_PLACEHOLDER, &query_helpers::repeat_vars(included_tags.len()))
                 .replace(sqlite_statements::SELECT_FILES_FOR_TAGS_TAG_COUNT, &included_tags.len().to_string())
         };
-    let mut stmt = connection.prepare(&formatted_stmt)?;
+    let formatted_stmt = formatted_stmt
+        .replace(sqlite_statements::RATIO_MIN_PLACEHOLDER, ratio_min.to_string().as_str())
+        .replace(sqlite_statements::RATIO_MAX_PLACEHOLDER, ratio_max.to_string().as_str());
+    let mut stmt = transaction.prepare(&formatted_stmt)?;
 
     if included_tags.len()!=0 && excluded_tags.len()!=0 {
-        let mut vec = Vec::<&String>::new();
+        let mut vec = Vec::<&str>::new();
         vec.extend(included_tags);
         vec.extend(excluded_tags);
         let params = rusqlite::params_from_iter(vec.iter());
@@ -126,22 +136,34 @@ pub fn get_files_with_tags(connection: &Connection, included_tags: &Vec<String>,
     }
 }
 
-pub fn get_tags_for_file(connection: &Connection, file: &ImageHandle) -> Result<Vec<PantsuTag>> {
-    let mut stmt = connection.prepare(sqlite_statements::SELECT_TAGS_FOR_FILE)?;
-    query_helpers::query_rows_as_tags(&mut stmt, [file.get_filename()])
+pub fn get_tags_for_file(transaction: &Transaction, image: &ImageHandle) -> Result<Vec<PantsuTag>> {
+    let mut stmt = transaction.prepare(sqlite_statements::SELECT_TAGS_FOR_FILE)?;
+    query_helpers::query_rows_as_tags(&mut stmt, [image.get_filename()])
 }
 
-pub fn get_all_tags(connection: &Connection) -> Result<Vec<PantsuTag>> {
-    let mut stmt = connection.prepare(sqlite_statements::SELECT_ALL_TAGS)?;
+pub fn get_tags_for_file_with_types(transaction: &Transaction, image: &ImageHandle, types: &Vec<&PantsuTagType>) -> Result<Vec<PantsuTag>> {
+    let formatted_stmt = sqlite_statements::SELECT_TAGS_FOR_FILE_WITH_TYPE
+        .replace(sqlite_statements::SELECT_TAGS_WITH_TYPE_PLACEHOLDER, &query_helpers::repeat_vars(types.len()));
+    let mut stmt = transaction.prepare(&formatted_stmt)?;
+
+    let mut params_vec = Vec::<String>::new();
+    params_vec.push(image.get_filename().to_string());
+    params_vec.extend(types.iter().map(|&t| t.to_string()).into_iter());
+    let params = rusqlite::params_from_iter(params_vec);
+    query_helpers::query_rows_as_tags(&mut stmt, params)
+}
+
+pub fn get_all_tags(transaction: &Transaction) -> Result<Vec<PantsuTag>> {
+    let mut stmt = transaction.prepare(sqlite_statements::SELECT_ALL_TAGS)?;
     query_helpers::query_rows_as_tags(&mut stmt, [])
 }
 
-pub fn get_tags_with_types(connection: &Connection, types: &Vec<PantsuTagType>) -> Result<Vec<PantsuTag>> {
+pub fn get_tags_with_types(transaction: &Transaction, types: &Vec<&PantsuTagType>) -> Result<Vec<PantsuTag>> {
     let formatted_stmt = sqlite_statements::SELECT_TAGS_WITH_TYPE
         .replace(sqlite_statements::SELECT_TAGS_WITH_TYPE_PLACEHOLDER, &query_helpers::repeat_vars(types.len()));
-    let mut stmt = connection.prepare(&formatted_stmt)?;
+    let mut stmt = transaction.prepare(&formatted_stmt)?;
 
-    let params = rusqlite::params_from_iter(types.iter().map(|t| t.to_string()).into_iter());
+    let params = rusqlite::params_from_iter(types.iter().map(|&t| t.to_string()).into_iter());
     query_helpers::query_rows_as_tags(&mut stmt, params)
 }
 

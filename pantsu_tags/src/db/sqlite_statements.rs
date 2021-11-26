@@ -35,6 +35,13 @@ pub const SELECT_ALL_FILES: &str =
     "SELECT filename, file_source, res_width, res_height FROM files
     ORDER BY filename ASC";
 
+pub const SELECT_ALL_FILES_RATIO: &str =
+    "SELECT filename, file_source, res_width, res_height FROM files
+    WHERE 1.0*res_height/res_width BETWEEN RATIO_MIN AND RATIO_MAX
+    ORDER BY filename ASC";
+
+pub const RATIO_MIN_PLACEHOLDER: &str = "RATIO_MIN";
+pub const RATIO_MAX_PLACEHOLDER: &str = "RATIO_MAX";
 pub const SELECT_FILES_FOR_TAGS_TAG_COUNT: &str= "TAG_COUNT";
 pub const SELECT_FILES_FOR_INCLUDING_TAGS_PLACEHOLDER: &str = "INCLUDE_TAG_LIST";
 pub const SELECT_FILES_FOR_INCLUDING_TAGS: &str =
@@ -46,6 +53,7 @@ pub const SELECT_FILES_FOR_INCLUDING_TAGS: &str =
         GROUP BY filename
         HAVING COUNT(DISTINCT tag)=TAG_COUNT
     )
+    AND 1.0*res_height/res_width BETWEEN RATIO_MIN AND RATIO_MAX
     ORDER BY filename ASC";
 
 pub const SELECT_FILES_FOR_EXCLUDING_TAGS_PLACEHOLDER: &str = "EXCLUDE_TAG_LIST";
@@ -59,6 +67,7 @@ pub const SELECT_FILES_FOR_EXCLUDING_TAGS: &str =
         GROUP BY filename
         HAVING COUNT(DISTINCT tag)>0
     )
+    AND 1.0*res_height/res_width BETWEEN RATIO_MIN AND RATIO_MAX
     ORDER BY filename ASC";
 
 pub const SELECT_FILES_FOR_INCLUDING_AND_EXCLUDING_TAGS: &str =
@@ -77,6 +86,7 @@ pub const SELECT_FILES_FOR_INCLUDING_AND_EXCLUDING_TAGS: &str =
         GROUP BY filename
         HAVING COUNT(DISTINCT tag)>0
     )
+    AND 1.0*res_height/res_width BETWEEN RATIO_MIN AND RATIO_MAX
     ORDER BY filename ASC";
 
 pub const SELECT_TAGS_FOR_FILE: &str =
@@ -94,6 +104,13 @@ pub const SELECT_TAGS_WITH_TYPE: &str =
     "SELECT tag, tag_type FROM tags
     WHERE tag_type IN (TAG_TYPE_LIST)
     ORDER BY tag_type ASC, tag ASC";
+
+pub const SELECT_TAGS_FOR_FILE_WITH_TYPE: &str =
+    "SELECT tags.tag, tags.tag_type FROM file_tags
+    JOIN tags ON file_tags.tag = tags.tag
+    WHERE file_tags.filename = (?)
+    AND tags.tag_type IN (TAG_TYPE_LIST)
+    ORDER BY tags.tag_type ASC, tags.tag ASC";
 
 // insert statements
 pub const INSERT_TAG_INTO_TAG_LIST: &str =
@@ -124,9 +141,11 @@ pub const DELETE_ALL_TAGS_FROM_FILE: &str =
     "DELETE FROM file_tags WHERE filename=(?)";
 
 // update statements
-pub const UPDATE_FILE: &str =
+pub const UPDATE_IMAGE: &str =
     "UPDATE files
-    SET file_source = (?)
+    SET file_source = (?),
+        res_width = (?),
+        res_height = (?)
     WHERE filename = (?)";
 
 // clear tables
