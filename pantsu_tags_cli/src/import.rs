@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use colored::Colorize;
 use pantsu_tags::db::PantsuDB;
 use pantsu_tags::{Error, get_thumbnail_link, ImageHandle, Sauce, SauceMatch};
+use pantsu_tags::db::transactions::{AddTagsTransaction, UpdateImageTransaction};
 use crate::common::{AppError, AppResult};
 use crate::feh;
 use crate::feh::FehProcesses;
@@ -95,14 +96,18 @@ fn import_one_image_auto_source(pdb: &mut PantsuDB, image: &PathBuf) -> AppResul
         Some(sauce) => {
             if sauce.similarity > FOUND_SIMILARITY_THRESHOLD {
                 let tags = pantsu_tags::get_sauce_tags(sauce)?;
-                pdb.update_file_sauce_with_tags(image_handle, Sauce::Match(sauce.link.clone()), &tags)?;
+                pdb.execute(
+                    AddTagsTransaction::new(&image_handle)
+                        .update_image_source(Sauce::Match(sauce.link.clone()))
+                        .with_tags(&tags)
+                )?;
             }
             else { // store image without tags for now, tags can be added in the sauce resolution
                 return Err(AppError::SauceUnsure(image_handle, relevant_sauces));
             }
         }
         None => { // store image without tags
-            pdb.update_file_source(image_handle, Sauce::NonExistent)?;
+            pdb.execute(UpdateImageTransaction::new(image_handle).with_sauce(Sauce::NonExistent))?;
             return Err(AppError::NoRelevantSauces);
         }
     }
@@ -144,12 +149,16 @@ fn resolve_sauce_unsure(pdb: &mut PantsuDB, images_to_resolve: Vec<SauceUnsure>,
                 }
                 let correct_sauce = &image.matches[num];
                 let tags = pantsu_tags::get_sauce_tags(correct_sauce)?;
-                pdb.update_file_sauce_with_tags(image.image_handle, Sauce::Match(correct_sauce.link.clone()), &tags)?;
+                pdb.execute(
+                    AddTagsTransaction::new(&image.image_handle)
+                        .with_tags(&tags)
+                        .update_image_source(Sauce::Match(correct_sauce.link.clone()))
+                )?;
                 println!("{}", "Successfully added tags to image".green());
                 break;
             }
             if input.eq("n") {
-                pdb.update_file_source(image.image_handle, Sauce::NonExistent)?;
+                pdb.execute(UpdateImageTransaction::new(image.image_handle).with_sauce(Sauce::NonExistent))?;
                 println!("No tags added");
                 break;
             }

@@ -1,12 +1,16 @@
 use std::path::{Path, PathBuf};
 use pantsu_tags::db::PantsuDB;
 use pantsu_tags::{Error, ImageHandle};
+use pantsu_tags::db::transactions::GetImagesTransaction;
 use crate::common::AppResult;
 
 pub fn get(included_tags: Vec<String>, excluded_tags: Vec<String>, temp_dir: Option<PathBuf>) -> AppResult<()> {
     let lib_dir = Path::new("./test_image_lib/");
-    let pdb = PantsuDB::new(Path::new("./pantsu_tags.db"))?;
-    let files = pdb.get_files_with_tags_but(&included_tags, &excluded_tags)?;
+    let mut pdb = PantsuDB::new(Path::new("./pantsu_tags.db"))?;
+    let files = pdb.execute(GetImagesTransaction::new()
+        .including_tags(&included_tags)
+        .exclude_tags(&excluded_tags)
+    )?;
 
     match temp_dir {
         Some(path) => link_files_to_tmp_dir(&files, lib_dir, &path),
