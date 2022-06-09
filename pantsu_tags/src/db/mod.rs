@@ -63,8 +63,8 @@ impl PantsuDB {
     pub fn remove_file(&mut self, file: &ImageHandle) -> Result<(), Error> {
         let transaction = self.conn.transaction()?;
 
-        db_calls::remove_all_tags_from_file(&transaction, file)?;
-        db_calls::remove_file_from_file_list(&transaction, file)?;
+        db_calls::remove_all_tags_from_file(&transaction, file.get_filename())?;
+        db_calls::remove_file_from_file_list(&transaction, file.get_filename())?;
         db_calls::remove_unused_tags(&transaction)?;
 
         transaction.commit()?;
@@ -74,10 +74,11 @@ impl PantsuDB {
     pub fn update_file_source(&mut self, file: ImageHandle, sauce: Sauce) -> Result<ImageHandle, Error> {
         let transaction = self.conn.transaction()?;
 
-        let new_handle = ImageHandle::new(String::from(file.get_filename()), sauce, file.get_res());
-        db_calls::update_file_source(&transaction, &new_handle)?;
+        db_calls::update_file_source(&transaction, &file.get_filename(), &sauce)?;
 
         transaction.commit()?;
+
+        let new_handle = ImageHandle::new(String::from(file.get_filename()), sauce, file.get_res());
         Ok(new_handle)
     }
 
@@ -86,21 +87,21 @@ impl PantsuDB {
     }
 
     pub fn get_all_files(&self) -> Result<Vec<ImageHandle>, Error> {
-        db_calls::get_all_files(&self.conn)
+        db_calls::get_files(&self.conn, &Vec::new(), &Vec::new())
     }
 
     pub fn get_files_with_tags(&self, included_tags: &Vec<String>) -> Result<Vec<ImageHandle>, Error> {
         if included_tags.len() == 0 {
             return self.get_all_files();
         }
-        db_calls::get_files_with_tags(&self.conn, included_tags, &Vec::<String>::new())
+        db_calls::get_files(&self.conn, included_tags, &Vec::<String>::new())
     }
 
-    pub fn get_files_with_tags_but(&self, included_tags: &Vec<String>, excluded_tags: &Vec<String>) -> Result<Vec<ImageHandle>, Error> {
+    pub fn get_files_with_tags_except(&self, included_tags: &Vec<String>, excluded_tags: &Vec<String>) -> Result<Vec<ImageHandle>, Error> {
         if included_tags.len() == 0 && excluded_tags.len() == 0 {
             return self.get_all_files();
         }
-        db_calls::get_files_with_tags(&self.conn, included_tags, excluded_tags)
+        db_calls::get_files(&self.conn, included_tags, excluded_tags)
     }
 
     // file->tag
@@ -108,7 +109,7 @@ impl PantsuDB {
         let transaction = self.conn.transaction()?;
 
         db_calls::add_tags_to_tag_list(&transaction, tags)?;
-        db_calls::add_tags_to_file_tags(&transaction, file, tags)?;
+        db_calls::add_tags_to_file(&transaction, file.get_filename(), tags)?;
 
         transaction.commit()?;
         Ok(())
@@ -117,20 +118,20 @@ impl PantsuDB {
     pub fn update_file_sauce_with_tags(&mut self, file: ImageHandle, sauce: Sauce, tags: &Vec<PantsuTag>) -> Result<ImageHandle, Error> {
         let transaction = self.conn.transaction()?;
 
-        let new_handle = ImageHandle::new(String::from(file.get_filename()), sauce, file.get_res());
-
-        db_calls::update_file_source(&transaction, &new_handle)?;
+        db_calls::update_file_source(&transaction, file.get_filename(), &sauce)?;
         db_calls::add_tags_to_tag_list(&transaction, tags)?;
-        db_calls::add_tags_to_file_tags(&transaction, &new_handle, tags)?;
+        db_calls::add_tags_to_file(&transaction, file.get_filename(), tags)?;
 
         transaction.commit()?;
+
+        let new_handle = ImageHandle::new(String::from(file.get_filename()), sauce, file.get_res());
         Ok(new_handle)
     }
 
     pub fn remove_tags(&mut self, file: &ImageHandle, tags: &Vec<String>) -> Result<(), Error> {
         let transaction = self.conn.transaction()?;
 
-        db_calls::remove_tags_from_file(&transaction, file, tags)?;
+        db_calls::remove_tags_from_file(&transaction, file.get_filename(), tags)?;
         db_calls::remove_unused_tags(&transaction)?;
 
         transaction.commit()?;
@@ -138,7 +139,7 @@ impl PantsuDB {
     }
 
     pub fn get_tags_for_file(&self, file: &ImageHandle) -> Result<Vec<PantsuTag>, Error> {
-        db_calls::get_tags_for_file(&self.conn, file)
+        db_calls::get_tags_for_file(&self.conn, file.get_filename())
     }
 
     // tags
@@ -180,8 +181,8 @@ mod tests {
         pdb.clear().unwrap();
         let img = &get_test_image();
         pdb.add_file_with_source(img).unwrap();
-        pdb.update_file_source(get_test_image(), Sauce::Match(String::from("https://fake.url"))).unwrap();
-        assert_eq!(pdb.get_file(img.get_filename()).unwrap().unwrap().get_sauce(), &Sauce::Match(String::from("https://fake.url")));
+        pdb.update_file_source(get_test_image(), Match(String::from("https://fake.url"))).unwrap();
+        assert_eq!(pdb.get_file(img.get_filename()).unwrap().unwrap().get_sauce(), &Match(String::from("https://fake.url")));
     }
 
     #[test]
@@ -235,7 +236,7 @@ mod tests {
                 "artist:Hehe".parse().unwrap(),
                 "character:Hihi".parse().unwrap(),
             ]).unwrap();
-        pdb.remove_tags(&get_test_image(), &vec!["general:Haha".parse().unwrap()]).unwrap();
+        pdb.remove_tags(&get_test_image(), &vec!["Haha".to_string()]).unwrap();
         let tags = pdb.get_tags_for_file(&get_test_image()).unwrap();
         assert_eq!(&tags, &vec!["artist:Hehe".parse().unwrap(), "character:Hihi".parse().unwrap()]);
     }
@@ -300,9 +301,9 @@ mod tests {
         assert_eq!(files, vec![get_test_image(), get_test_image2()]);
         let files = pdb.get_files_with_tags(&vec![String::from("Huhu")]).unwrap();
         assert_eq!(files, vec![get_test_image2()]);
-        let files = pdb.get_files_with_tags_but(&Vec::new(), &vec![String::from("Huhu")]).unwrap();
+        let files = pdb.get_files_with_tags_except(&Vec::new(), &vec![String::from("Huhu")]).unwrap();
         assert_eq!(files, vec![get_test_image()]);
-        let files = pdb.get_files_with_tags_but(&vec![String::from("Haha")], &vec![String::from("Huhu")]).unwrap();
+        let files = pdb.get_files_with_tags_except(&vec![String::from("Haha")], &vec![String::from("Huhu")]).unwrap();
         assert_eq!(files, vec![get_test_image()]);
     }
 
@@ -363,10 +364,10 @@ mod tests {
     }
 
     fn get_test_image() -> ImageHandle {
-        ImageHandle::new(String::from("test_image_1db8ab6c94e95f36a9dd5bde347f6dd1.png"), Sauce::NotChecked, (0, 0))
+        ImageHandle::new(String::from("1b64e362cdf968d9-c1fc07e23e05e2fc0be39ce8cc88f8044fcf.jpg"), Sauce::NotChecked, (0, 0))
     }
 
     fn get_test_image2() -> ImageHandle {
-        ImageHandle::new(String::from("test_image_4f76b8d52983af1d28b1bf8d830d684e.png"), Match(String::from("http://real.url")), (0, 0))
+        ImageHandle::new(String::from("c3811874f801fd63-03f07d07b03b05f3370670df0db0ff037037.jpg"), Match(String::from("http://real.url")), (0, 0))
     }
 }

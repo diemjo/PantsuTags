@@ -124,7 +124,7 @@ pub const DELETE_ALL_TAGS_FROM_FILE: &str =
     "DELETE FROM file_tags WHERE filename=(?)";
 
 // update statements
-pub const UPDATE_FILE: &str =
+pub const UPDATE_FILE_SOURCE: &str =
     "UPDATE files
     SET file_source = (?)
     WHERE filename = (?)";
