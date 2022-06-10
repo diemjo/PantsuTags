@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 use crate::common::error;
-use crate::db::PantsuDB;
+use crate::db::{PantsuDB};
 use crate::file_handler::import;
 
 pub use crate::common::error::Error;
@@ -23,7 +23,7 @@ pub fn new_image_handle(pantsu_db: &mut PantsuDB, image_path: &Path, error_on_si
 
     let image_name = image_info.filename;
     let image_res = image_info.file_res;
-    if pantsu_db.get_file(image_name.as_str())?.is_some() {
+    if pantsu_db.get_image_transaction(image_name.as_str()).execute()?.is_some() {
         return Err(Error::ImageAlreadyExists(error::get_path(image_path)));
     }
 
@@ -36,7 +36,7 @@ pub fn new_image_handle(pantsu_db: &mut PantsuDB, image_path: &Path, error_on_si
 
     import::import_file(LIB_PATH, image_path, &image_name)?;
     let file_handle = ImageHandle::new(image_name, Sauce::NonExistent, image_res);
-    pantsu_db.add_file_with_source(&file_handle)?;
+    pantsu_db.add_images_transaction().add_image(&file_handle).execute()?;
     Ok(file_handle)
 }
 
@@ -53,7 +53,7 @@ pub fn get_sauce_tags(sauce: &SauceMatch) -> Result<Vec<PantsuTag>> {
 }
 
 fn get_similar_images(pantsu_db: &PantsuDB, file_name: &str, min_dist: u32) -> Result<Vec<ImageHandle>> {
-    let files = pantsu_db.get_all_files()?;
+    let files = pantsu_db.get_images_transaction().execute()?;
     file_handler::hash::get_similarity_distances(file_name, files, min_dist)
 }
 
@@ -77,7 +77,7 @@ mod tests {
         let best_match = &sauces[0];
         // in general, you would want to check the similarity here
         let tags = crate::get_sauce_tags(&best_match).unwrap();
-        pdb.update_file_sauce_with_tags(image_handle, Sauce::Match(best_match.link.clone()), &tags).unwrap();
+        pdb.update_images_transaction().for_image(image_handle.get_filename()).update_sauce(&Sauce::Match(best_match.link.clone())).add_tags(&tags).execute().unwrap();
     }
 
     #[test]

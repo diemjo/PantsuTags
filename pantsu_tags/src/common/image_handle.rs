@@ -6,7 +6,7 @@ use crate::LIB_PATH;
 use crate::Sauce::{NonExistent, NotChecked};
 
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct ImageHandle {
     filename: String,
     file_source: Sauce,
@@ -37,7 +37,7 @@ impl ImageHandle {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Sauce {
     Match(String),
     NonExistent,

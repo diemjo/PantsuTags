@@ -95,12 +95,19 @@ pub const SELECT_TAGS_WITH_TYPE: &str =
     WHERE tag_type IN (TAG_TYPE_LIST)
     ORDER BY tag_type ASC, tag ASC";
 
+pub const SELECT_TAGS_FOR_FILE_WITH_TYPE: &str =
+    "SELECT tags.tag, tags.tag_type FROM file_tags
+    JOIN tags ON file_tags.tag = tags.tag
+    WHERE file_tags.filename = (?)
+    AND tags.tag_type IN (TAG_TYPE_LIST)
+    ORDER BY tags.tag_type ASC, tags.tag ASC";
+
 // insert statements
 pub const INSERT_TAG_INTO_TAG_LIST: &str =
     "INSERT OR IGNORE INTO tags (tag, tag_type) VALUES (?, ?)";
 
 pub const INSERT_FILE_INTO_FILE_LIST: &str =
-    "INSERT OR IGNORE INTO files (filename, file_source, res_width, res_height) VALUES (?, ?, ?, ?)";
+    "INSERT INTO files (filename, file_source, res_width, res_height) VALUES (?, ?, ?, ?)";
 
 pub const INSERT_TAG_FOR_FILE: &str =
     "INSERT OR IGNORE INTO file_tags (filename, tag) VALUES (?, ?)";

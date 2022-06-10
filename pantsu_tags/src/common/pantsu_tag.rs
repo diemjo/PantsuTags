@@ -4,7 +4,7 @@ use std::str::FromStr;
 use enum_iterator::IntoEnumIterator;
 use crate::common::error::Error;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct PantsuTag {
     pub tag_name: String,
     pub tag_type: PantsuTagType
@@ -29,7 +29,7 @@ impl FromStr for PantsuTag {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, IntoEnumIterator)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, IntoEnumIterator)]
 pub enum PantsuTagType {
     Artist,
     Source,

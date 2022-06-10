@@ -150,7 +150,16 @@ pub fn get_tags_with_types(connection: &Connection, types: &Vec<PantsuTagType>) 
     query_helpers::query_rows_as_tags(&mut stmt, params)
 }
 
+pub fn get_tags_for_file_with_types(connection: &Connection, filename: &str, types: &Vec<PantsuTagType>) -> Result<Vec<PantsuTag>> {
+    let formatted_stmt = sqlite_statements::SELECT_TAGS_FOR_FILE_WITH_TYPE
+        .replace(sqlite_statements::SELECT_TAGS_WITH_TYPE_PLACEHOLDER, &query_helpers::repeat_vars(types.len()));
+    let mut stmt = connection.prepare(&formatted_stmt)?;
 
+    let mut vec = vec![filename.to_string()];
+    vec.extend(types.iter().map(|t| t.to_string()).into_iter());
+    let params = rusqlite::params_from_iter(vec);
+    query_helpers::query_rows_as_tags(&mut stmt, params)
+}
 
 mod query_helpers {
     use rusqlite::{Params, Row, Statement};
