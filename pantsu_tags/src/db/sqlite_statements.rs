@@ -31,8 +31,10 @@ pub const SELECT_FILE: &str =
     "SELECT filename, file_source, res_width, res_height FROM files
     WHERE filename = (?)";
 
+pub const SAUCE_TYPE_PLACEHOLDER: &str = "SAUCE_TYPE";
 pub const SELECT_ALL_FILES: &str =
     "SELECT filename, file_source, res_width, res_height FROM files
+    WHERE file_source LIKE 'SAUCE_TYPE'
     ORDER BY filename ASC";
 
 pub const SELECT_FILES_FOR_TAGS_TAG_COUNT: &str= "TAG_COUNT";
@@ -46,6 +48,7 @@ pub const SELECT_FILES_FOR_INCLUDING_TAGS: &str =
         GROUP BY filename
         HAVING COUNT(DISTINCT tag)=TAG_COUNT
     )
+    AND file_source LIKE 'SAUCE_TYPE'
     ORDER BY filename ASC";
 
 pub const SELECT_FILES_FOR_EXCLUDING_TAGS_PLACEHOLDER: &str = "EXCLUDE_TAG_LIST";
@@ -59,6 +62,7 @@ pub const SELECT_FILES_FOR_EXCLUDING_TAGS: &str =
         GROUP BY filename
         HAVING COUNT(DISTINCT tag)>0
     )
+    AND file_source LIKE 'SAUCE_TYPE'
     ORDER BY filename ASC";
 
 pub const SELECT_FILES_FOR_INCLUDING_AND_EXCLUDING_TAGS: &str =
@@ -77,6 +81,7 @@ pub const SELECT_FILES_FOR_INCLUDING_AND_EXCLUDING_TAGS: &str =
         GROUP BY filename
         HAVING COUNT(DISTINCT tag)>0
     )
+    AND file_source LIKE 'SAUCE_TYPE'
     ORDER BY filename ASC";
 
 pub const SELECT_TAGS_FOR_FILE: &str =

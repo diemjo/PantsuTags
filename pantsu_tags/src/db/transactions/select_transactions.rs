@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::iter::FromIterator;
 use rusqlite::Connection;
-use crate::db::{AspectRatio, db_calls};
+use crate::db::{AspectRatio, db_calls, SauceType};
 use crate::{ImageHandle, PantsuTag, PantsuTagType};
 use crate::error::Result;
 
@@ -30,7 +30,8 @@ pub struct SelectImagesTransaction<'a> {
     connection: &'a Connection,
     include_tags: HashSet<String>,
     exclude_tags: HashSet<String>,
-    ratio: AspectRatio
+    ratio: AspectRatio,
+    sauce_type: SauceType,
 }
 
 impl<'a> SelectImagesTransaction<'a> {
@@ -39,7 +40,8 @@ impl<'a> SelectImagesTransaction<'a> {
             connection,
             include_tags: HashSet::new(),
             exclude_tags: HashSet::new(),
-            ratio: AspectRatio::Any
+            ratio: AspectRatio::Any,
+            sauce_type: SauceType::Any,
         }
     }
 
@@ -68,9 +70,24 @@ impl<'a> SelectImagesTransaction<'a> {
         self
     }
 
+    pub fn with_not_checked_sauce(mut self) -> Self {
+        self.sauce_type = SauceType::NotChecked;
+        self
+    }
+
+    pub fn with_not_existing_sauce(mut self) -> Self {
+        self.sauce_type = SauceType::NotExisting;
+        self
+    }
+
+    pub fn with_existing_sauce(mut self) -> Self {
+        self.sauce_type = SauceType::Existing;
+        self
+    }
+
 //impl<'a> PantsuTransaction<Vec<ImageHandle>> for SelectImagesTransaction<'a> {
     pub fn execute(self) -> Result<Vec<ImageHandle>> {
-        let files = db_calls::get_files(self.connection, &Vec::from_iter(self.include_tags), &Vec::from_iter(self.exclude_tags))?;
+        let files = db_calls::get_files(self.connection, &Vec::from_iter(self.include_tags), &Vec::from_iter(self.exclude_tags), self.sauce_type)?;
         let files = match self.ratio {
             AspectRatio::Any => files,
             AspectRatio:: Max(max) => files.into_iter()

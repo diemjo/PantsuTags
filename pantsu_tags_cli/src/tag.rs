@@ -6,11 +6,9 @@ use crate::common::AppResult;
 
 pub fn tag_list(tag_types: Vec<PantsuTagType>) -> AppResult<()> {
     let db = PantsuDB::new(Path::new("./pantsu_tags.db"))?;
-    let tags = if tag_types.len()==0 {
-        db.get_all_tags()?
-    } else {
-        db.get_tags_with_types(&tag_types)?
-    };
+    let tags = db.get_tags_transaction()
+            .with_types(&tag_types)
+            .execute()?;
     for tag in tags {
         println!("{}", tag)
     }
@@ -20,18 +18,26 @@ pub fn tag_list(tag_types: Vec<PantsuTagType>) -> AppResult<()> {
 pub fn tag_add(tags: Vec<PantsuTag>, image: String) -> AppResult<()> {
     let mut db = PantsuDB::new(Path::new("./pantsu_tags.db"))?;
     let image = get_filename(image)?;
-    let image =  db.get_file(&image)?
+    let image =  db.get_image_transaction(&image)
+        .execute()?
         .ok_or_else(|| Error::ImageNotFoundInDB(image))?;
-    db.add_tags_to_file(&image, &tags)?;
+    db.update_images_transaction()
+        .for_image(image.get_filename())
+        .add_tags(&tags)
+        .execute()?;
     Ok(())
 }
 
 pub fn tag_rm(tags: Vec<String>, image: String) -> AppResult<()> {
     let mut db = PantsuDB::new(Path::new("./pantsu_tags.db"))?;
     let image = get_filename(image)?;
-    let image =  db.get_file(&image)?
+    let image =  db.get_image_transaction(&image)
+        .execute()?
         .ok_or_else(|| Error::ImageNotFoundInDB(image))?;
-    db.remove_tags(&image, &tags)?;
+    db.update_images_transaction()
+        .for_image(image.get_filename())
+        .remove_tags(&tags)
+        .execute()?;
     Ok(())
 }
 
@@ -43,9 +49,12 @@ pub fn tag_get(images: Vec<String>) -> AppResult<()> {
     let db = PantsuDB::new(Path::new("./pantsu_tags.db"))?;
     for (i, name) in images.into_iter().enumerate() {
         let image = get_filename(name)?;
-        let image = db.get_file(&image)?
+        let image = db.get_image_transaction(&image)
+            .execute()?
             .ok_or_else(|| Error::ImageNotFoundInDB(image))?;
-        let tags = db.get_tags_for_file(&image)?;
+        let tags = db.get_tags_transaction()
+            .for_image(image.get_filename())
+            .execute()?;
 
         if len>1 {
             println!("{}:", image.get_filename().green());

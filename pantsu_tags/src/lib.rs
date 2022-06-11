@@ -35,7 +35,7 @@ pub fn new_image_handle(pantsu_db: &mut PantsuDB, image_path: &Path, error_on_si
     }
 
     import::import_file(LIB_PATH, image_path, &image_name)?;
-    let file_handle = ImageHandle::new(image_name, Sauce::NonExistent, image_res);
+    let file_handle = ImageHandle::new(image_name, Sauce::NotChecked, image_res);
     pantsu_db.add_images_transaction().add_image(&file_handle).execute()?;
     Ok(file_handle)
 }

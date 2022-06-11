@@ -6,7 +6,10 @@ use crate::common::AppResult;
 pub fn get(included_tags: Vec<String>, excluded_tags: Vec<String>, temp_dir: Option<PathBuf>) -> AppResult<()> {
     let lib_dir = Path::new("./test_image_lib/");
     let pdb = PantsuDB::new(Path::new("./pantsu_tags.db"))?;
-    let files = pdb.get_files_with_tags_except(&included_tags, &excluded_tags)?;
+    let files = pdb.get_images_transaction()
+        .including_tags(&included_tags)
+        .excluding_tags(&excluded_tags)
+        .execute()?;
 
     match temp_dir {
         Some(path) => link_files_to_tmp_dir(&files, lib_dir, &path),

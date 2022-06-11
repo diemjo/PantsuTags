@@ -3,11 +3,11 @@ use crate::common::error::Result;
 use crate::common::error::Error::{SQLError, SQLPrimaryKeyError};
 use crate::common::image_handle::ImageHandle;
 use crate::common::pantsu_tag::{PantsuTag, PantsuTagType};
-use crate::db::sqlite_statements;
+use crate::db::{SauceType, sqlite_statements};
 use crate::Sauce;
 
 // INSERT
-pub fn add_tags_to_tag_list(transaction: &Transaction, tags: &Vec<PantsuTag>) -> Result<()> {
+pub(crate) fn add_tags_to_tag_list(transaction: &Transaction, tags: &Vec<PantsuTag>) -> Result<()> {
     let mut add_tag_list_stmt = transaction.prepare(sqlite_statements::INSERT_TAG_INTO_TAG_LIST)?;
     for tag in tags {
         add_tag_list_stmt.execute([&tag.tag_name, &tag.tag_type.to_string()])?;
@@ -15,7 +15,7 @@ pub fn add_tags_to_tag_list(transaction: &Transaction, tags: &Vec<PantsuTag>) ->
     Ok(())
 }
 
-pub fn add_file_to_file_list(transaction: &Transaction, file: &ImageHandle) -> Result<()> {
+pub(crate) fn add_file_to_file_list(transaction: &Transaction, file: &ImageHandle) -> Result<()> {
     let mut add_file_list_stmt = transaction.prepare(sqlite_statements::INSERT_FILE_INTO_FILE_LIST)?;
     let res = add_file_list_stmt.execute(params![file.get_filename(), file.get_sauce(), file.get_res().0, file.get_res().1]);
     // check for primary key constraint
@@ -28,7 +28,7 @@ pub fn add_file_to_file_list(transaction: &Transaction, file: &ImageHandle) -> R
     }
 }
 
-pub fn add_tags_to_file(transaction: &Transaction, filename: &str, tags: &Vec<PantsuTag>) -> Result<()> {
+pub(crate) fn add_tags_to_file(transaction: &Transaction, filename: &str, tags: &Vec<PantsuTag>) -> Result<()> {
     let mut add_tag_stmt = transaction.prepare(sqlite_statements::INSERT_TAG_FOR_FILE)?;
     for tag in tags {
         add_tag_stmt.execute([filename, tag.tag_name.as_str()])?;
@@ -37,25 +37,25 @@ pub fn add_tags_to_file(transaction: &Transaction, filename: &str, tags: &Vec<Pa
 }
 
 // UPDATE
-pub fn update_file_source(transaction: &Transaction, filename: &str, sauce: &Sauce) -> Result<()> {
+pub(crate) fn update_file_source(transaction: &Transaction, filename: &str, sauce: &Sauce) -> Result<()> {
     let mut update_file_statement = transaction.prepare(sqlite_statements::UPDATE_FILE_SOURCE)?;
     update_file_statement.execute(params![sauce, filename])?;
     Ok(())
 }
 
 // DELETE
-pub fn remove_unused_tags(transaction: &Transaction) -> Result<()> {
+pub(crate) fn remove_unused_tags(transaction: &Transaction) -> Result<()> {
     transaction.execute(sqlite_statements::DELETE_UNUSED_TAGS, [])?;
     Ok(())
 }
 
-pub fn remove_file_from_file_list(transaction: &Transaction, filename: &str) -> Result<()> {
+pub(crate) fn remove_file_from_file_list(transaction: &Transaction, filename: &str) -> Result<()> {
     let mut remove_file_list_stmt = transaction.prepare(sqlite_statements::DELETE_FILE_FROM_FILE_LIST)?;
     remove_file_list_stmt.execute([filename])?;
     Ok(())
 }
 
-pub fn remove_tags_from_file(transaction: &Transaction, filename: &str, tags: &Vec<String>) -> Result<()> {
+pub(crate) fn remove_tags_from_file(transaction: &Transaction, filename: &str, tags: &Vec<String>) -> Result<()> {
     let mut remove_tag_stmt = transaction.prepare(sqlite_statements::DELETE_TAG_FROM_FILE)?;
     for tag in tags {
         remove_tag_stmt.execute([filename, tag.as_str()])?;
@@ -63,29 +63,29 @@ pub fn remove_tags_from_file(transaction: &Transaction, filename: &str, tags: &V
     Ok(())
 }
 
-pub fn remove_all_tags_from_file(transaction: &Transaction, filename: &str) -> Result<()> {
+pub(crate) fn remove_all_tags_from_file(transaction: &Transaction, filename: &str) -> Result<()> {
     let mut remove_tags_stmt = transaction.prepare(sqlite_statements::DELETE_ALL_TAGS_FROM_FILE)?;
     remove_tags_stmt.execute([filename])?;
     Ok(())
 }
 
-pub fn clear_all_file_tags(transaction: &Transaction) -> Result<()> {
+pub(crate) fn clear_all_file_tags(transaction: &Transaction) -> Result<()> {
     transaction.execute(sqlite_statements::CLEAR_FILE_TAGS, [])?;
     Ok(())
 }
 
-pub fn clear_all_files(transaction: &Transaction) -> Result<()> {
+pub(crate) fn clear_all_files(transaction: &Transaction) -> Result<()> {
     transaction.execute(sqlite_statements::CLEAR_FILE_LIST, [])?;
     Ok(())
 }
 
-pub fn clear_all_tags(transaction: &Transaction) -> Result<()> {
+pub(crate) fn clear_all_tags(transaction: &Transaction) -> Result<()> {
     transaction.execute(sqlite_statements::CLEAR_TAG_LIST, [])?;
     Ok(())
 }
 
 // SELECT
-pub fn get_file(connection: &Connection, filename: &str) -> Result<Option<ImageHandle>> {
+pub(crate) fn get_file(connection: &Connection, filename: &str) -> Result<Option<ImageHandle>> {
     let mut stmt = connection.prepare(sqlite_statements::SELECT_FILE)?;
     query_helpers::query_row_as_file(&mut stmt, [filename])
 }
@@ -95,7 +95,7 @@ pub fn get_all_files(connection: &Connection) -> Result<Vec<ImageHandle>> {
     query_helpers::query_rows_as_files(&mut stmt, [])
 }
 */
-pub fn get_files(connection: &Connection, included_tags: &Vec<String>, excluded_tags: &Vec<String>) -> Result<Vec<ImageHandle>> {
+pub(crate) fn get_files(connection: &Connection, included_tags: &Vec<String>, excluded_tags: &Vec<String>, sauce_type: SauceType) -> Result<Vec<ImageHandle>> {
     let formatted_stmt =
         if included_tags.len()!=0 && excluded_tags.len()!=0 {
             sqlite_statements::SELECT_FILES_FOR_INCLUDING_AND_EXCLUDING_TAGS
@@ -112,6 +112,12 @@ pub fn get_files(connection: &Connection, included_tags: &Vec<String>, excluded_
         } else {
             sqlite_statements::SELECT_ALL_FILES.to_string()
         };
+    let formatted_stmt = formatted_stmt.replace(sqlite_statements::SAUCE_TYPE_PLACEHOLDER, match sauce_type {
+        SauceType::Existing => "http%",
+        SauceType::NotExisting => crate::common::image_handle::NOT_EXISTING_FLAG,
+        SauceType::NotChecked => crate::common::image_handle::NOT_CHECKED_FLAG,
+        SauceType::Any => "%",
+    });
     let mut stmt = connection.prepare(&formatted_stmt)?;
 
     if included_tags.len()!=0 && excluded_tags.len()!=0 {
@@ -131,17 +137,17 @@ pub fn get_files(connection: &Connection, included_tags: &Vec<String>, excluded_
     }
 }
 
-pub fn get_tags_for_file(connection: &Connection, filename: &str) -> Result<Vec<PantsuTag>> {
+pub(crate) fn get_tags_for_file(connection: &Connection, filename: &str) -> Result<Vec<PantsuTag>> {
     let mut stmt = connection.prepare(sqlite_statements::SELECT_TAGS_FOR_FILE)?;
     query_helpers::query_rows_as_tags(&mut stmt, [filename])
 }
 
-pub fn get_all_tags(connection: &Connection) -> Result<Vec<PantsuTag>> {
+pub(crate) fn get_all_tags(connection: &Connection) -> Result<Vec<PantsuTag>> {
     let mut stmt = connection.prepare(sqlite_statements::SELECT_ALL_TAGS)?;
     query_helpers::query_rows_as_tags(&mut stmt, [])
 }
 
-pub fn get_tags_with_types(connection: &Connection, types: &Vec<PantsuTagType>) -> Result<Vec<PantsuTag>> {
+pub(crate) fn get_tags_with_types(connection: &Connection, types: &Vec<PantsuTagType>) -> Result<Vec<PantsuTag>> {
     let formatted_stmt = sqlite_statements::SELECT_TAGS_WITH_TYPE
         .replace(sqlite_statements::SELECT_TAGS_WITH_TYPE_PLACEHOLDER, &query_helpers::repeat_vars(types.len()));
     let mut stmt = connection.prepare(&formatted_stmt)?;
@@ -150,7 +156,7 @@ pub fn get_tags_with_types(connection: &Connection, types: &Vec<PantsuTagType>) 
     query_helpers::query_rows_as_tags(&mut stmt, params)
 }
 
-pub fn get_tags_for_file_with_types(connection: &Connection, filename: &str, types: &Vec<PantsuTagType>) -> Result<Vec<PantsuTag>> {
+pub(crate) fn get_tags_for_file_with_types(connection: &Connection, filename: &str, types: &Vec<PantsuTagType>) -> Result<Vec<PantsuTag>> {
     let formatted_stmt = sqlite_statements::SELECT_TAGS_FOR_FILE_WITH_TYPE
         .replace(sqlite_statements::SELECT_TAGS_WITH_TYPE_PLACEHOLDER, &query_helpers::repeat_vars(types.len()));
     let mut stmt = connection.prepare(&formatted_stmt)?;

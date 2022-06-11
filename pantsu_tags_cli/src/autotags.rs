@@ -54,7 +54,8 @@ pub fn auto_add_tags(images: Vec<PathBuf>, no_feh: bool) -> AppResult<()> {
 }
 
 fn auto_add_tags_one_image(pdb: &mut PantsuDB, image_path: &str) -> AppResult<()> {
-    let image_handle = pdb.get_file(image_path)?
+    let image_handle = pdb.get_image_transaction(image_path)
+        .execute()?
         .ok_or(AppError::ImageNotFound(String::from(image_path)))?;
     let sauces = pantsu_tags::get_image_sauces(&image_handle)?;
     let relevant_sauces: Vec<SauceMatch> = sauces.into_iter().filter(|s| s.similarity > RELEVANT_SIMILARITY_THESHOLD).collect();
@@ -62,7 +63,11 @@ fn auto_add_tags_one_image(pdb: &mut PantsuDB, image_path: &str) -> AppResult<()
         Some(sauce) => {
             if sauce.similarity > FOUND_SIMILARITY_THRESHOLD {
                 let tags = pantsu_tags::get_sauce_tags(sauce)?;
-                pdb.update_file_sauce_with_tags(image_handle, Sauce::Match(sauce.link.clone()), &tags)?;
+                pdb.update_images_transaction()
+                    .for_image(image_handle.get_filename())
+                    .update_sauce(&Sauce::Match(sauce.link.clone()))
+                    .add_tags(&tags)
+                    .execute()?;
             }
             else { // tags can be added in the sauce resolution
                 // todo: maybe add Sauce::NotChecked
@@ -70,7 +75,10 @@ fn auto_add_tags_one_image(pdb: &mut PantsuDB, image_path: &str) -> AppResult<()
             }
         }
         None => { // mark in db that there are no sources for this image
-            pdb.update_file_source(image_handle, Sauce::NonExistent)?;
+            pdb.update_images_transaction()
+                .for_image(image_handle.get_filename())
+                .update_sauce(&Sauce::NotExisting)
+                .execute()?;
             return Err(AppError::NoRelevantSauces);
         }
     }
@@ -107,13 +115,20 @@ fn resolve_sauce_unsure(pdb: &mut PantsuDB, images_to_resolve: Vec<SauceUnsure>,
                 }
                 let correct_sauce = &image.matches[num];
                 let tags = pantsu_tags::get_sauce_tags(correct_sauce)?;
-                pdb.update_file_sauce_with_tags(image.image_handle, Sauce::Match(correct_sauce.link.clone()), &tags)?;
+                pdb.update_images_transaction()
+                    .for_image(image.image_handle.get_filename())
+                    .update_sauce(&Sauce::Match(correct_sauce.link.clone()))
+                    .add_tags(&tags)
+                    .execute()?;
                 stats.success += 1;
                 println!("{}", "Successfully added tags to image".green());
                 break;
             }
             if input.eq("n") {
-                pdb.update_file_source(image.image_handle, Sauce::NonExistent)?;
+                pdb.update_images_transaction()
+                    .for_image(image.image_handle.get_filename())
+                    .update_sauce(&Sauce::NotExisting)
+                    .execute()?;
                 stats.no_source += 1;
                 println!("No tags added");
                 break;

@@ -1,16 +1,15 @@
 use std::fmt::Debug;
 use rusqlite::ToSql;
 use rusqlite::types::{FromSql, FromSqlResult, ToSqlOutput, ValueRef};
-use crate::common::image_handle::Sauce::Match;
 use crate::LIB_PATH;
-use crate::Sauce::{NonExistent, NotChecked};
+use crate::Sauce::{NotExisting, NotChecked, Match};
 
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct ImageHandle {
     filename: String,
     file_source: Sauce,
-    file_res: (u32, u32)
+    file_res: (u32, u32),
 }
 
 impl ImageHandle {
@@ -40,7 +39,7 @@ impl ImageHandle {
 #[derive(Debug, PartialEq, Clone)]
 pub enum Sauce {
     Match(String),
-    NonExistent,
+    NotExisting,
     NotChecked
 }
 
@@ -48,7 +47,7 @@ impl ToSql for Sauce {
     fn to_sql(&self) -> rusqlite::Result<ToSqlOutput<'_>> {
         let sql = match self {
             Match(sauce) => ToSqlOutput::from(sauce.as_str()),
-            NonExistent => ToSqlOutput::from(NON_EXISTENT_FLAG),
+            NotExisting => ToSqlOutput::from(NOT_EXISTING_FLAG),
             NotChecked => ToSqlOutput::from(NOT_CHECKED_FLAG)
         };
         rusqlite::Result::Ok(sql)
@@ -58,7 +57,7 @@ impl ToSql for Sauce {
 impl FromSql for Sauce {
     fn column_result(value: ValueRef<'_>) -> FromSqlResult<Self> {
         let row = match value.as_str().unwrap() {
-            NON_EXISTENT_FLAG => NonExistent,
+            NOT_EXISTING_FLAG => NotExisting,
             NOT_CHECKED_FLAG => NotChecked,
             sauce => Match(String::from(sauce))
         };
@@ -66,8 +65,8 @@ impl FromSql for Sauce {
     }
 }
 
-const NON_EXISTENT_FLAG: &str =
-    "NON_EXISTENT";
+pub const NOT_EXISTING_FLAG: &str =
+    "NOT_EXISTING";
 
-const NOT_CHECKED_FLAG: &str =
+pub const NOT_CHECKED_FLAG: &str =
     "NOT_CHECKED";
