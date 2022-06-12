@@ -7,9 +7,9 @@ use crate::db::{SauceType, sqlite_statements};
 use crate::Sauce;
 
 // INSERT
-pub(crate) fn add_tags_to_tag_list(transaction: &Transaction, tags: &Vec<PantsuTag>) -> Result<()> {
+pub(crate) fn add_tags_to_tag_list(transaction: &Transaction, tags: &Vec<&PantsuTag>) -> Result<()> {
     let mut add_tag_list_stmt = transaction.prepare(sqlite_statements::INSERT_TAG_INTO_TAG_LIST)?;
-    for tag in tags {
+    for &tag in tags {
         add_tag_list_stmt.execute([&tag.tag_name, &tag.tag_type.to_string()])?;
     }
     Ok(())
@@ -28,9 +28,9 @@ pub(crate) fn add_file_to_file_list(transaction: &Transaction, file: &ImageHandl
     }
 }
 
-pub(crate) fn add_tags_to_file(transaction: &Transaction, filename: &str, tags: &Vec<PantsuTag>) -> Result<()> {
+pub(crate) fn add_tags_to_file(transaction: &Transaction, filename: &str, tags: &Vec<&PantsuTag>) -> Result<()> {
     let mut add_tag_stmt = transaction.prepare(sqlite_statements::INSERT_TAG_FOR_FILE)?;
-    for tag in tags {
+    for &tag in tags {
         add_tag_stmt.execute([filename, tag.tag_name.as_str()])?;
     }
     Ok(())
@@ -55,10 +55,10 @@ pub(crate) fn remove_file_from_file_list(transaction: &Transaction, filename: &s
     Ok(())
 }
 
-pub(crate) fn remove_tags_from_file(transaction: &Transaction, filename: &str, tags: &Vec<String>) -> Result<()> {
+pub(crate) fn remove_tags_from_file(transaction: &Transaction, filename: &str, tags: &Vec<&str>) -> Result<()> {
     let mut remove_tag_stmt = transaction.prepare(sqlite_statements::DELETE_TAG_FROM_FILE)?;
     for tag in tags {
-        remove_tag_stmt.execute([filename, tag.as_str()])?;
+        remove_tag_stmt.execute([filename, tag])?;
     }
     Ok(())
 }
@@ -95,7 +95,7 @@ pub fn get_all_files(connection: &Connection) -> Result<Vec<ImageHandle>> {
     query_helpers::query_rows_as_files(&mut stmt, [])
 }
 */
-pub(crate) fn get_files(connection: &Connection, included_tags: &Vec<String>, excluded_tags: &Vec<String>, sauce_type: SauceType) -> Result<Vec<ImageHandle>> {
+pub(crate) fn get_files(connection: &Connection, included_tags: &Vec<&str>, excluded_tags: &Vec<&str>, sauce_type: SauceType) -> Result<Vec<ImageHandle>> {
     let formatted_stmt =
         if included_tags.len()!=0 && excluded_tags.len()!=0 {
             sqlite_statements::SELECT_FILES_FOR_INCLUDING_AND_EXCLUDING_TAGS
@@ -121,7 +121,7 @@ pub(crate) fn get_files(connection: &Connection, included_tags: &Vec<String>, ex
     let mut stmt = connection.prepare(&formatted_stmt)?;
 
     if included_tags.len()!=0 && excluded_tags.len()!=0 {
-        let mut vec = Vec::<&String>::new();
+        let mut vec = Vec::<&str>::new();
         vec.extend(included_tags);
         vec.extend(excluded_tags);
         let params = rusqlite::params_from_iter(vec.iter());

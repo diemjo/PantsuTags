@@ -7,20 +7,20 @@ use crate::error::Result;
 
 pub struct SelectImageTransaction<'a> {
     connection: &'a Connection,
-    filename: String,
+    filename: &'a str,
 }
 
 impl<'a> SelectImageTransaction<'a> {
-    pub(crate) fn new(connection: &'a Connection, filename: &str) -> Self {
+    pub(crate) fn new(connection: &'a Connection, filename: &'a str) -> Self {
         SelectImageTransaction {
             connection,
-            filename: filename.to_string(),
+            filename,
         }
     }
 
 //impl<'a> PantsuTransaction<Option<ImageHandle>> for SelectImageTransaction<'a> {
     pub fn execute(self) -> Result<Option<ImageHandle>> {
-        db_calls::get_file(self.connection, self.filename.as_str())
+        db_calls::get_file(self.connection, self.filename)
     }
 }
 
@@ -28,8 +28,8 @@ impl<'a> SelectImageTransaction<'a> {
 
 pub struct SelectImagesTransaction<'a> {
     connection: &'a Connection,
-    include_tags: HashSet<String>,
-    exclude_tags: HashSet<String>,
+    include_tags: HashSet<&'a str>,
+    exclude_tags: HashSet<&'a str>,
     ratio: AspectRatio,
     sauce_type: SauceType,
 }
@@ -45,23 +45,29 @@ impl<'a> SelectImagesTransaction<'a> {
         }
     }
 
-    pub fn including_tag(mut self, tag: &str) -> Self {
-        self.include_tags.insert(tag.to_string());
+    pub fn including_tag(mut self, tag: &'a str) -> Self {
+        self.include_tags.insert(tag);
         self
     }
 
-    pub fn including_tags(mut self, tags: &Vec<String>) -> Self {
-        self.include_tags.extend(tags.clone());
+    pub fn including_tags(mut self, tags: &'a Vec<String>) -> Self {
+        let tags : Vec<&str> = tags.iter()
+            .map(|t|t.as_str())
+            .collect();
+        self.include_tags.extend(tags);
         self
     }
 
-    pub fn excluding_tag(mut self, tag: &str) -> Self {
-        self.exclude_tags.insert(tag.to_string());
+    pub fn excluding_tag(mut self, tag: &'a str) -> Self {
+        self.exclude_tags.insert(tag);
         self
     }
 
-    pub fn excluding_tags(mut self, tags: &Vec<String>) -> Self {
-        self.exclude_tags.extend(tags.clone());
+    pub fn excluding_tags(mut self, tags: &'a Vec<String>) -> Self {
+        let tags : Vec<&str> = tags.iter()
+            .map(|t|t.as_str())
+            .collect();
+        self.exclude_tags.extend(tags);
         self
     }
 
@@ -115,7 +121,7 @@ impl<'a> SelectImagesTransaction<'a> {
 
 pub struct SelectTagsTransaction<'a> {
     connection: &'a Connection,
-    filename: Option<String>,
+    filename: Option<&'a str>,
     types: HashSet<PantsuTagType>,
 }
 
@@ -128,8 +134,8 @@ impl<'a> SelectTagsTransaction<'a> {
         }
     }
 
-    pub fn for_image(mut self, filename: &str) -> Self {
-        self.filename = Some(filename.to_string());
+    pub fn for_image(mut self, filename: &'a str) -> Self {
+        self.filename = Some(filename);
         self
     }
 
@@ -142,9 +148,9 @@ impl<'a> SelectTagsTransaction<'a> {
     pub fn execute(self) -> Result<Vec<PantsuTag>> {
         match self.filename {
             Some(filename) => if self.types.len()==0 {
-                db_calls::get_tags_for_file(self.connection, filename.as_str())
+                db_calls::get_tags_for_file(self.connection, filename)
             } else {
-                db_calls::get_tags_for_file_with_types(self.connection, filename.as_str(), &Vec::from_iter(self.types))
+                db_calls::get_tags_for_file_with_types(self.connection, filename, &Vec::from_iter(self.types))
             },
             None => if self.types.len()==0 {
                 db_calls::get_all_tags(self.connection)

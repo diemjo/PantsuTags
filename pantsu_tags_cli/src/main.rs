@@ -37,7 +37,7 @@ fn main() -> Result<(), AppError> {
         Args::List(args) => {
             match args {
                 ListArgs::Images { temp_dir, include_tags, exclude_tags } => {
-                    get::get(include_tags, exclude_tags, temp_dir)
+                    get::get(&include_tags, &exclude_tags, temp_dir)
                 },
                 ListArgs::Tags { tag_types } => {
                     tag::tag_list(tag_types)

@@ -5,7 +5,7 @@ use crate::error::{Result, Error};
 
 pub struct InsertImagesTransaction<'a> {
     connection: &'a mut Connection,
-    images: Vec<ImageHandle>,
+    images: Vec<&'a ImageHandle>,
 }
 
 impl<'a> InsertImagesTransaction<'a> {
@@ -16,13 +16,13 @@ impl<'a> InsertImagesTransaction<'a> {
         }
     }
 
-    pub fn add_image(mut self, image: &ImageHandle) -> Self {
-        self.images.push(image.clone());
+    pub fn add_image(mut self, image: &'a ImageHandle) -> Self {
+        self.images.push(image);
         self
     }
 
-    pub fn add_images(mut self, images: &Vec<ImageHandle>) -> Self {
-        self.images.extend(images.clone());
+    pub fn add_images(mut self, images: &'a Vec<ImageHandle>) -> Self {
+        self.images.extend(images);
         self
     }
 

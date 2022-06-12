@@ -3,7 +3,7 @@ use pantsu_tags::db::PantsuDB;
 use pantsu_tags::{Error, ImageHandle};
 use crate::common::AppResult;
 
-pub fn get(included_tags: Vec<String>, excluded_tags: Vec<String>, temp_dir: Option<PathBuf>) -> AppResult<()> {
+pub fn get(included_tags: &Vec<String>, excluded_tags: &Vec<String>, temp_dir: Option<PathBuf>) -> AppResult<()> {
     let lib_dir = Path::new("./test_image_lib/");
     let pdb = PantsuDB::new(Path::new("./pantsu_tags.db"))?;
     let files = pdb.get_images_transaction()

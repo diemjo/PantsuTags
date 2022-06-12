@@ -61,7 +61,7 @@ impl PantsuDB {
     }
 
     // select
-    pub fn get_image_transaction<'a>(&'a self, filename: &str) -> SelectImageTransaction<'a> {
+    pub fn get_image_transaction<'a>(&'a self, filename: &'a str) -> SelectImageTransaction<'a> {
         SelectImageTransaction::new(&self.conn, filename)
     }
 

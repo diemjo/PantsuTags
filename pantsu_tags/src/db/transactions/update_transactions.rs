@@ -7,10 +7,10 @@ use crate::{PantsuTag, Sauce};
 
 pub struct UpdateImagesTransaction<'a> {
     connection: &'a mut Connection,
-    filenames: HashSet<String>,
-    sauce: Option<Sauce>,
-    tags_to_add: HashSet<PantsuTag>,
-    tags_to_remove: HashSet<String>,
+    filenames: HashSet<&'a str>,
+    sauce: Option<&'a Sauce>,
+    tags_to_add: HashSet<&'a PantsuTag>,
+    tags_to_remove: HashSet<&'a str>,
 }
 
 impl<'a> UpdateImagesTransaction<'a> {
@@ -24,38 +24,44 @@ impl<'a> UpdateImagesTransaction<'a> {
         }
     }
 
-    pub fn for_image(mut self, filename: &str) -> Self {
-        self.filenames.insert(filename.to_string());
+    pub fn for_image(mut self, filename: &'a str) -> Self {
+        self.filenames.insert(filename);
         self
     }
 
-    pub fn for_images(mut self, filenames: &Vec<String>) -> Self {
-        self.filenames.extend(filenames.clone());
+    pub fn for_images(mut self, filenames: &'a Vec<String>) -> Self {
+        let filenames : Vec<&str> = filenames.iter()
+            .map(|f|f.as_str())
+            .collect();
+        self.filenames.extend(filenames);
         self
     }
 
-    pub fn update_sauce(mut self, sauce: &Sauce) -> Self {
-        self.sauce = Some(sauce.clone());
+    pub fn update_sauce(mut self, sauce: &'a Sauce) -> Self {
+        self.sauce = Some(sauce);
         self
     }
 
-    pub fn add_tag(mut self, tag: &PantsuTag) -> Self {
-        self.tags_to_add.insert(tag.clone());
+    pub fn add_tag(mut self, tag: &'a PantsuTag) -> Self {
+        self.tags_to_add.insert(tag);
         self
     }
 
-    pub fn add_tags(mut self, tags: &Vec<PantsuTag>) -> Self {
-        self.tags_to_add.extend(tags.clone());
+    pub fn add_tags(mut self, tags: &'a Vec<PantsuTag>) -> Self {
+        self.tags_to_add.extend(tags);
         self
     }
 
-    pub fn remove_tag(mut self, tag: &str) -> Self {
-        self.tags_to_remove.insert(tag.to_string());
+    pub fn remove_tag(mut self, tag: &'a str) -> Self {
+        self.tags_to_remove.insert(tag);
         self
     }
 
-    pub fn remove_tags(mut self, tags: &Vec<String>) -> Self {
-        self.tags_to_remove.extend(tags.clone());
+    pub fn remove_tags(mut self, tags: &'a Vec<String>) -> Self {
+        let tags : Vec<&str> = tags.iter()
+            .map(|f|f.as_str())
+            .collect();
+        self.tags_to_remove.extend(tags);
         self
     }
 
@@ -75,17 +81,17 @@ impl<'a> UpdateImagesTransaction<'a> {
 
         for filename in self.filenames {
             if self.sauce.is_some() {
-                db_calls::update_file_source(&transaction, filename.as_str(), self.sauce.as_ref().unwrap())?;
+                db_calls::update_file_source(&transaction, filename, self.sauce.as_ref().unwrap())?;
             }
 
 
             if !tags_to_remove.is_empty() {
-                db_calls::remove_tags_from_file(&transaction, filename.as_str(), &tags_to_remove)?;
+                db_calls::remove_tags_from_file(&transaction, filename, &tags_to_remove)?;
                 db_calls::remove_unused_tags(&transaction)?;
             }
             if !tags_to_add.is_empty() {
                 db_calls::add_tags_to_tag_list(&transaction, &tags_to_add)?;
-                db_calls::add_tags_to_file(&transaction, filename.as_str(), &tags_to_add)?;
+                db_calls::add_tags_to_file(&transaction, filename, &tags_to_add)?;
             }
         }
         transaction.commit()?;
