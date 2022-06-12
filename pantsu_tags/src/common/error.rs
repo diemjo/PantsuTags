@@ -42,6 +42,9 @@ pub enum Error {
     #[error("Image not found in database: {0}")]
     ImageNotFoundInDB(String),
 
+    #[error("{0}. Please update program to the newest version.")]
+    ProgramOutdated(String),
+
     // file system
     #[error("File not found: {1}")]
     FileNotFound(#[source] std::io::Error, String),

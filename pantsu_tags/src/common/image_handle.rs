@@ -1,6 +1,4 @@
 use std::fmt::Debug;
-use rusqlite::ToSql;
-use rusqlite::types::{FromSql, FromSqlResult, ToSqlOutput, ValueRef};
 use crate::LIB_PATH;
 use crate::Sauce::{NotExisting, NotChecked, Match};
 
@@ -43,7 +41,25 @@ pub enum Sauce {
     NotChecked
 }
 
-impl ToSql for Sauce {
+impl Sauce {
+    pub fn get_type(&self) -> &str {
+        match self {
+            Match(_) => EXISTING_FLAG,
+            NotChecked => NOT_CHECKED_FLAG,
+            NotExisting => NOT_EXISTING_FLAG,
+        }
+    }
+
+    pub fn get_value(&self) -> Option<&str> {
+        match self {
+            Match(value) => Some(value.as_str()),
+            NotChecked => None,
+            NotExisting => None,
+        }
+    }
+}
+
+/*impl ToSql for Sauce {
     fn to_sql(&self) -> rusqlite::Result<ToSqlOutput<'_>> {
         let sql = match self {
             Match(sauce) => ToSqlOutput::from(sauce.as_str()),
@@ -63,8 +79,10 @@ impl FromSql for Sauce {
         };
         FromSqlResult::Ok(row)
     }
-}
+}*/
 
+pub const EXISTING_FLAG: &str =
+    "EXISTING";
 pub const NOT_EXISTING_FLAG: &str =
     "NOT_EXISTING";
 

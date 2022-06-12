@@ -17,7 +17,7 @@ pub(crate) fn add_tags_to_tag_list(transaction: &Transaction, tags: &Vec<&Pantsu
 
 pub(crate) fn add_file_to_file_list(transaction: &Transaction, file: &ImageHandle) -> Result<()> {
     let mut add_file_list_stmt = transaction.prepare(sqlite_statements::INSERT_FILE_INTO_FILE_LIST)?;
-    let res = add_file_list_stmt.execute(params![file.get_filename(), file.get_sauce(), file.get_res().0, file.get_res().1]);
+    let res = add_file_list_stmt.execute(params![file.get_filename(), file.get_sauce().get_type(), file.get_sauce().get_value(), file.get_res().0, file.get_res().1]);
     // check for primary key constraint
     return if let Err(rusqlite::Error::SqliteFailure(ffi::Error { code: _, extended_code: 1555 }, ..)) = res {
         Err(SQLPrimaryKeyError(res.unwrap_err()))
@@ -38,8 +38,8 @@ pub(crate) fn add_tags_to_file(transaction: &Transaction, filename: &str, tags: 
 
 // UPDATE
 pub(crate) fn update_file_source(transaction: &Transaction, filename: &str, sauce: &Sauce) -> Result<()> {
-    let mut update_file_statement = transaction.prepare(sqlite_statements::UPDATE_FILE_SOURCE)?;
-    update_file_statement.execute(params![sauce, filename])?;
+    let mut update_file_statement = transaction.prepare(sqlite_statements::UPDATE_IMAGE_SOURCE)?;
+    update_file_statement.execute(params![sauce.get_type(), sauce.get_value(), filename])?;
     Ok(())
 }
 
@@ -113,7 +113,7 @@ pub(crate) fn get_files(connection: &Connection, included_tags: &Vec<&str>, excl
             sqlite_statements::SELECT_ALL_FILES.to_string()
         };
     let formatted_stmt = formatted_stmt.replace(sqlite_statements::SAUCE_TYPE_PLACEHOLDER, match sauce_type {
-        SauceType::Existing => "http%",
+        SauceType::Existing => crate::common::image_handle::EXISTING_FLAG,
         SauceType::NotExisting => crate::common::image_handle::NOT_EXISTING_FLAG,
         SauceType::NotChecked => crate::common::image_handle::NOT_CHECKED_FLAG,
         SauceType::Any => "%",
@@ -169,9 +169,11 @@ pub(crate) fn get_tags_for_file_with_types(connection: &Connection, filename: &s
 
 mod query_helpers {
     use rusqlite::{Params, Row, Statement};
+    use rusqlite::types::Type;
     use crate::common::error::Result;
-    use crate::common::image_handle::ImageHandle;
+    use crate::common::image_handle::{EXISTING_FLAG, NOT_EXISTING_FLAG, NOT_CHECKED_FLAG, ImageHandle};
     use crate::common::pantsu_tag::PantsuTag;
+    use crate::{Error, Sauce};
 
     pub fn query_row_as_file<P: Params>(stmt: &mut Statement, params: P) -> Result<Option<ImageHandle>> {
         let file = stmt.query_row(params, image_handle_from_row);
@@ -199,8 +201,13 @@ mod query_helpers {
         Ok(
             ImageHandle::new(
                 row.get(0).unwrap(),
-                row.get(1).unwrap(),
-                (row.get(2).unwrap(), row.get(3).unwrap())
+                match row.get::<usize, String>(1).unwrap().as_str() {
+                    EXISTING_FLAG => Sauce::Match(row.get(2).unwrap()),
+                    NOT_EXISTING_FLAG => Sauce::NotExisting,
+                    NOT_CHECKED_FLAG => Sauce::NotChecked,
+                    s => return Err(rusqlite::Error::FromSqlConversionFailure(0, Type::Text, Box::new(Error::InvalidTagType(s.to_string()))))
+                },
+                (row.get(3).unwrap(), row.get(4).unwrap())
             )
         )
     }
