@@ -1,72 +1,97 @@
+use clap::{Parser, ArgGroup};
 use std::path::PathBuf;
-use structopt::StructOpt;
 use pantsu_tags::{PantsuTag, PantsuTagType};
 
-#[derive(Debug, StructOpt)]
-#[structopt(name = "PantsuTags", about = "PantsuTags CLI")]
+#[derive(Debug, Parser)]
+#[clap(name = "PantsuTags", about = "PantsuTags CLI")]
 pub enum Args {
-    Image(ImageArgs),
-    List(ListArgs)
+    ImportImages(ImportImagesArgs),
+    RemoveImages(RemoveImagesArgs),
+    AddTags(AddTagsArgs),
+    RemoveTags(RemoveTagsArgs),
+    ListTags(ListTagsArgs),
+    ImageInfos(ImageInfosArgs),
+    ListImages(ListImagesArgs),
+    AutoLookupTags(AutoLookupTagsArgs),
 }
 
-#[derive(Debug, StructOpt)]
-pub enum ImageArgs {
-    Import {
-        #[structopt(long)]
-        no_feh: bool,
-
-        #[structopt(parse(from_os_str))]
-        images: Vec<PathBuf>,
-    },
-    #[structopt(about="Add tags to an image")]
-    AddTags {
-        #[structopt(about = "Tags to add to the image")]
-        #[structopt(parse(try_from_str))]
-        tags: Vec<PantsuTag>,
-
-        #[structopt(about = "The image to add tags to")]
-        #[structopt(short, long, parse(from_str))]
-        image: String
-    },
-    #[structopt(about="Remove tags from an image")]
-    RmTags {
-        #[structopt(about = "Tags to remove from the image")]
-        tags: Vec<String>,
-
-        #[structopt(about = "The image to remove tags from")]
-        #[structopt(short, long, parse(from_str))]
-        image: String
-    },
-    AutoAddTags {
-        #[structopt(long)]
-        no_feh: bool,
-
-        #[structopt(parse(from_os_str))]
-        images: Vec<PathBuf>,
-    },
-    GetTags {
-        #[structopt(about = "The image to retrieve tags for")]
-        #[structopt(parse(from_str))]
-        images: Vec<String>
-    }
+#[derive(Debug, Parser)]
+pub struct ImportImagesArgs {
+    #[clap(parse(from_os_str), required=true, min_values=1)]
+    pub images: Vec<PathBuf>,
+    #[clap(short, long)]
+    pub no_feh: bool
 }
 
-#[derive(Debug, StructOpt)]
-pub enum ListArgs {
-    #[structopt(about = "List tags in database")]
-    Tags {
-        #[structopt(about = "Filter tags to list by tags type")]
-        #[structopt(short, long="types", parse(try_from_str))]
-        tag_types: Vec<PantsuTagType>,
-    },
+#[derive(Debug, Parser)]
+pub struct RemoveImagesArgs {
+    #[clap(parse(from_os_str), required=true, min_values=1)]
+    pub images: Vec<PathBuf>,
+}
 
-    #[structopt(about="List files, filtered by tags if provided")]
-    Images {
-        #[structopt(short, long, parse(from_os_str))]
-        temp_dir: Option<PathBuf>,
-        #[structopt(short, long)]
-        include_tags: Vec<String>,
-        #[structopt(short, long)]
-        exclude_tags: Vec<String>,
-    },
+#[derive(Debug, Parser)]
+pub struct AddTagsArgs {
+    #[clap(short, long, parse(from_os_str), required=true, min_values=1)]
+    pub images: Vec<PathBuf>,
+    #[clap(short, long, parse(try_from_str), required=true, min_values=1)]
+    pub tags: Vec<PantsuTag>,
+}
+
+#[derive(Debug, Parser)]
+pub struct RemoveTagsArgs {
+    #[clap(short, long, parse(from_os_str), required=true, min_values=1)]
+    pub images: Vec<PathBuf>,
+    #[clap(short, long, required=true, min_values=1)]
+    pub tags: Vec<String>,
+}
+
+#[derive(Debug, Parser)]
+pub struct ListTagsArgs {
+    #[clap(short, long, parse(from_os_str))]
+    pub images: Vec<PathBuf>,
+    #[clap(short, long="types", parse(try_from_str))]
+    pub tag_types: Vec<PantsuTagType>,
+}
+
+#[derive(Debug, Parser)]
+pub struct ImageInfosArgs {
+    #[clap(short, long, parse(from_os_str))]
+    pub images: Vec<PathBuf>,
+}
+
+#[derive(Debug, Parser)]
+#[clap(group(ArgGroup::new("sauce").args(&["sauce-existing", "sauce-not-existing", "sauce-not-checked"])))]
+pub struct ListImagesArgs {
+    #[clap(short, long)]
+    pub include_tags: Vec<String>,
+    #[clap(short, long)]
+    pub exclude_tags: Vec<String>,
+
+    #[clap(short='l', long)]
+    pub aspect_ratio_min: Option<f32>,
+    #[clap(short='u', long)]
+    pub aspect_ratio_max: Option<f32>,
+
+    #[clap(short='s', long)]
+    pub sauce_existing: bool,
+    #[clap(short='n', long)]
+    pub sauce_not_existing: bool,
+    #[clap(short='c', long)]
+    pub sauce_not_checked: bool,
+}
+
+#[derive(Debug, Parser)]
+#[clap(group(ArgGroup::new("sauce").args(&["sauce-existing", "sauce-not-existing", "sauce-not-checked"])))]
+pub struct AutoLookupTagsArgs {
+    #[clap(short, long, parse(from_os_str))]
+    pub images: Vec<PathBuf>,
+    #[clap(short, long)]
+    pub no_feh: bool,
+
+    #[clap(short='s', long)]
+    pub sauce_existing: bool,
+    #[clap(short='n', long)]
+    pub sauce_not_existing: bool,
+    #[clap(short='c', long)]
+    pub sauce_not_checked: bool,
 }

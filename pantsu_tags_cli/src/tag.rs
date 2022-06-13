@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{Path};
 use colored::Colorize;
 use pantsu_tags::db::PantsuDB;
 use pantsu_tags::{Error, file_handler, PantsuTag, PantsuTagType};
@@ -15,37 +15,41 @@ pub fn tag_list(tag_types: Vec<PantsuTagType>) -> AppResult<()> {
     Ok(())
 }
 
-pub fn tag_add(tags: Vec<PantsuTag>, image: String) -> AppResult<()> {
+pub fn tag_add(tags: Vec<PantsuTag>, images: Vec<String>) -> AppResult<()> {
     let mut db = PantsuDB::new(Path::new("./pantsu_tags.db"))?;
-    let image = get_filename(image)?;
-    let image =  db.get_image_transaction(&image)
-        .execute()?
-        .ok_or_else(|| Error::ImageNotFoundInDB(image))?;
-    db.update_images_transaction()
-        .for_image(image.get_filename())
-        .add_tags(&tags)
-        .execute()?;
+    for image in images {
+        let image = get_filename(image)?;
+        let image = db.get_image_transaction(&image)
+            .execute()?
+            .ok_or_else(|| Error::ImageNotFoundInDB(image))?;
+        db.update_images_transaction()
+            .for_image(image.get_filename())
+            .add_tags(&tags)
+            .execute()?;
+    }
     Ok(())
 }
 
-pub fn tag_rm(tags: Vec<String>, image: String) -> AppResult<()> {
+pub fn tag_rm(tags: Vec<String>, images: Vec<String>) -> AppResult<()> {
     let mut db = PantsuDB::new(Path::new("./pantsu_tags.db"))?;
-    let image = get_filename(image)?;
-    let image =  db.get_image_transaction(&image)
-        .execute()?
-        .ok_or_else(|| Error::ImageNotFoundInDB(image))?;
-    db.update_images_transaction()
-        .for_image(image.get_filename())
-        .remove_tags(&tags)
-        .execute()?;
+    for image in images {
+        let image = get_filename(image)?;
+        let image = db.get_image_transaction(&image)
+            .execute()?
+            .ok_or_else(|| Error::ImageNotFoundInDB(image))?;
+        db.update_images_transaction()
+            .for_image(image.get_filename())
+            .remove_tags(&tags)
+            .execute()?;
+    }
     Ok(())
 }
 
-pub fn tag_get(images: Vec<String>) -> AppResult<()> {
+pub fn tag_get(images: Vec<String>, tag_types: Vec<PantsuTagType>) -> AppResult<()> {
+    let len = images.len();
     if images.len()==0 {
         eprintln!("Warning: No image was provided");
     }
-    let len = images.len();
     let db = PantsuDB::new(Path::new("./pantsu_tags.db"))?;
     for (i, name) in images.into_iter().enumerate() {
         let image = get_filename(name)?;
@@ -54,6 +58,7 @@ pub fn tag_get(images: Vec<String>) -> AppResult<()> {
             .ok_or_else(|| Error::ImageNotFoundInDB(image))?;
         let tags = db.get_tags_transaction()
             .for_image(image.get_filename())
+            .with_types(&tag_types)
             .execute()?;
 
         if len>1 {

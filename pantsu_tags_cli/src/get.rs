@@ -1,19 +1,33 @@
 use std::path::{Path, PathBuf};
-use pantsu_tags::db::PantsuDB;
+use pantsu_tags::db::{AspectRatio, PantsuDB};
 use pantsu_tags::{Error, ImageHandle};
 use crate::common::AppResult;
 
-pub fn get(included_tags: &Vec<String>, excluded_tags: &Vec<String>, temp_dir: Option<PathBuf>) -> AppResult<()> {
+pub fn get(included_tags: &Vec<String>, excluded_tags: &Vec<String>, ratio: AspectRatio,
+           sauce_existing: bool, sauce_not_existing: bool, sauce_not_checked: bool,
+           temp_dir: Option<PathBuf>) -> AppResult<()> {
     let lib_dir = Path::new("./test_image_lib/");
     let pdb = PantsuDB::new(Path::new("./pantsu_tags.db"))?;
-    let files = pdb.get_images_transaction()
+    let images_transaction = pdb.get_images_transaction()
         .including_tags(&included_tags)
         .excluding_tags(&excluded_tags)
-        .execute()?;
+        .with_ratio(ratio);
+
+    let images_transaction = if sauce_existing {
+        images_transaction.with_existing_sauce()
+    } else if sauce_not_existing {
+        images_transaction.with_not_existing_sauce()
+    } else if sauce_not_checked {
+        images_transaction.with_not_checked_sauce()
+    } else {
+        images_transaction
+    };
+
+    let images = images_transaction.execute()?;
 
     match temp_dir {
-        Some(path) => link_files_to_tmp_dir(&files, lib_dir, &path),
-        None => print_file_paths(&files, lib_dir),
+        Some(path) => link_files_to_tmp_dir(&images, lib_dir, &path),
+        None => print_file_paths(&images, lib_dir),
     }
 }
 
