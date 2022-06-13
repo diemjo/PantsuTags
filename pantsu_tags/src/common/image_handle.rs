@@ -1,4 +1,4 @@
-use std::fmt::Debug;
+use std::fmt::{Debug, Display, format, Formatter, Pointer};
 use crate::LIB_PATH;
 use crate::Sauce::{NotExisting, NotChecked, Match};
 
@@ -31,6 +31,16 @@ impl ImageHandle {
 
     pub fn get_res(&self) -> (u32, u32) {
         self.file_res
+    }
+}
+
+impl Display for ImageHandle {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}: res={:>12}, sauce='{}'", self.filename, format!("({},{})", self.file_res.0, self.file_res.1), match self.get_sauce() {
+            Match(url) => url,
+            NotExisting => NOT_EXISTING_FLAG,
+            NotChecked => NOT_CHECKED_FLAG,
+        })
     }
 }
 

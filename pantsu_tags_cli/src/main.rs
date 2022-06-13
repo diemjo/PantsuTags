@@ -1,15 +1,14 @@
-use clap::{Parser};
+use clap::Parser;
+
 use pantsu_tags::db::AspectRatio;
-use crate::cli::{Args};
+
+use crate::cli::Args;
 use crate::common::AppError;
 
 mod common;
 mod cli;
-mod get;
-mod import;
-mod tag;
 mod feh;
-mod autotags;
+mod cmds;
 
 
 fn main() -> Result<(), AppError> {
@@ -17,43 +16,33 @@ fn main() -> Result<(), AppError> {
     //println!("Got arguments {:?}", args);
     let res: Result<(), AppError> = match args {
         Args::ImportImages(args) => {
-            import::import(args.no_feh, args.images)?;
-            Ok(())
+            cmds::import_images(args.no_feh, args.images)
         },
-        Args::RemoveImages(_) => {
-            Err(AppError::NoRelevantSauces)
+        Args::RemoveImages(args) => {
+            cmds::remove_images(args.images)
         },
         Args::AddTags(args) => {
-            tag::tag_add(args.tags, args.images.into_iter().map(|i|i.to_string_lossy().to_string()).collect())?;
-            Ok(())
+            cmds::add_tags(args.tags, args.images)
         },
         Args::RemoveTags(args) => {
-            tag::tag_rm(args.tags, args.images.into_iter().map(|i|i.to_string_lossy().to_string()).collect())?;
-            Ok(())
+            cmds::remove_tags(args.tags, args.images)
         },
         Args::ListTags(args) => {
-            if args.images.len()==0 {
-                tag::tag_list(args.tag_types)?;
-            } else {
-                tag::tag_get(args.images.into_iter().map(|i|i.to_string_lossy().to_string()).collect(), args.tag_types)?;
-            }
-            Ok(())
+            cmds::list_tags(args.images, args.tag_types)
         },
-        Args::ImageInfos(_) => {
-            Err(AppError::NoRelevantSauces)
+        Args::ImageInfos(args) => {
+            cmds::image_infos(args.images)
         },
         Args::ListImages(args) => {
-            get::get(&args.include_tags, &args.exclude_tags, match (args.aspect_ratio_min, args.aspect_ratio_max) {
+            cmds::list_images(&args.include_tags, &args.exclude_tags, match (args.aspect_ratio_min, args.aspect_ratio_max) {
                 (Some(min), Some(max)) => AspectRatio::Range(min, max),
                 (Some(min), None) => AspectRatio::Min(min),
                 (None, Some(max)) => AspectRatio::Max(max),
                 (None, None) => AspectRatio::Any,
-            }, args.sauce_existing, args.sauce_not_existing, args.sauce_not_checked, None)?;
-            Ok(())
+            }, args.sauce_existing, args.sauce_not_existing, args.sauce_not_checked, None)
         },
         Args::AutoLookupTags(args) => {
-            autotags::auto_add_tags(args.images, args.no_feh)?;
-            Ok(())
+            cmds::auto_add_tags(args.images, args.no_feh)
         }
     };
 

@@ -7,7 +7,7 @@ use crate::common::{AppError, AppResult};
 use crate::feh;
 use crate::feh::FehProcesses;
 
-pub fn import(no_feh: bool, images: Vec<PathBuf>) -> AppResult<()> {
+pub fn import_images(no_feh: bool, images: Vec<PathBuf>) -> AppResult<()> {
     let mut import_stats = ImportStats::default();
     let mut similar_images_cases: Vec<SimilarImagesExistCase> = Vec::new();
     let pdb_path = Path::new("./pantsu_tags.db");

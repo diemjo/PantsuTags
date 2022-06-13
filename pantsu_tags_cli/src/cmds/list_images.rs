@@ -3,9 +3,9 @@ use pantsu_tags::db::{AspectRatio, PantsuDB};
 use pantsu_tags::{Error, ImageHandle};
 use crate::common::AppResult;
 
-pub fn get(included_tags: &Vec<String>, excluded_tags: &Vec<String>, ratio: AspectRatio,
-           sauce_existing: bool, sauce_not_existing: bool, sauce_not_checked: bool,
-           temp_dir: Option<PathBuf>) -> AppResult<()> {
+pub fn list_images(included_tags: &Vec<String>, excluded_tags: &Vec<String>, ratio: AspectRatio,
+                   sauce_existing: bool, sauce_not_existing: bool, sauce_not_checked: bool,
+                   temp_dir: Option<PathBuf>) -> AppResult<()> {
     let lib_dir = Path::new("./test_image_lib/");
     let pdb = PantsuDB::new(Path::new("./pantsu_tags.db"))?;
     let images_transaction = pdb.get_images_transaction()
