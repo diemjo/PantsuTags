@@ -41,14 +41,15 @@ pub(crate) fn calculate_fileinfo(path: &Path) -> Result<ImageInfo> {
     })
 }
 
-pub fn get_similarity_distances(filename: &str, files: Vec<ImageHandle>, min_dist: u32) -> Result<Vec<ImageHandle>> {
+pub fn get_similarity_distances<'a>(filename: &str, files: &Vec<&'a str>, max_dist: u32) -> Result<Vec<&'a str>> {
     let file_hash = extract_hash(filename)?;
-    Ok(files.into_iter()
-        .filter(|file|{
-            let p_hash = extract_hash(file.get_filename()).unwrap();
+    Ok(files.iter()
+        .map(|&file| file)
+        .filter(|&file|{
+            let p_hash = extract_hash(file).unwrap();
             let dist = file_hash.distance(&p_hash);
-            dist < min_dist && file.get_filename()!=filename
-        }).collect::<Vec<ImageHandle>>())
+            dist < max_dist && file!=filename
+        }).collect::<Vec<&str>>())
 }
 
 fn extract_hash(filename: &str) -> Result<Blockhash144> {
