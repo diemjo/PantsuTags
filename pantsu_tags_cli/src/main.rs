@@ -1,15 +1,21 @@
+use clap::lazy_static::lazy_static;
 use clap::Parser;
 
 use pantsu_tags::db::AspectRatio;
 
 use crate::cli::Args;
 use crate::common::AppError;
+use crate::config::AppConfig;
 
 mod common;
 mod cli;
 mod feh;
 mod cmds;
+mod config;
 
+lazy_static! {
+    pub static ref CONFIGURATION: AppConfig = AppConfig::load_config();
+}
 
 fn main() -> Result<(), AppError> {
     let args = Args::parse();

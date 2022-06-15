@@ -1,17 +1,16 @@
 use std::io;
-use std::path::{Path, PathBuf};
+use std::path::{PathBuf};
 use colored::Colorize;
 use pantsu_tags::db::PantsuDB;
 use pantsu_tags::{Error, ImageHandle};
 use crate::common::{AppError, AppResult};
-use crate::feh;
+use crate::{CONFIGURATION, feh};
 use crate::feh::FehProcesses;
 
 pub fn import_images(no_feh: bool, images: Vec<PathBuf>) -> AppResult<()> {
     let mut import_stats = ImportStats::default();
     let mut similar_images_cases: Vec<SimilarImagesExistCase> = Vec::new();
-    let pdb_path = Path::new("./pantsu_tags.db");
-    let mut pdb = PantsuDB::new(pdb_path)?;
+    let mut pdb = PantsuDB::new(CONFIGURATION.database_path.as_path())?;
     for image in &images {
         let image_name = image.to_str().unwrap_or("(can't display image name)");
         let res = pantsu_tags::new_image_handle(&mut pdb, image, true);

@@ -33,4 +33,7 @@ pub enum AppError {
 
     #[error(transparent)]
     LibError(#[from] Error),
+
+    #[error("Failed to load config")]
+    ConfigError(#[from] figment::Error),
 }

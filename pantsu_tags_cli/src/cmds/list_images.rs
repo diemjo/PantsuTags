@@ -2,12 +2,12 @@ use std::path::{Path, PathBuf};
 use pantsu_tags::db::{AspectRatio, PantsuDB};
 use pantsu_tags::{Error, ImageHandle};
 use crate::common::AppResult;
+use crate::CONFIGURATION;
 
 pub fn list_images(included_tags: &Vec<String>, excluded_tags: &Vec<String>, ratio: AspectRatio,
                    sauce_existing: bool, sauce_not_existing: bool, sauce_not_checked: bool,
                    temp_dir: Option<PathBuf>) -> AppResult<()> {
-    let lib_dir = Path::new("./test_image_lib/");
-    let pdb = PantsuDB::new(Path::new("./pantsu_tags.db"))?;
+    let pdb = PantsuDB::new(CONFIGURATION.database_path.as_path())?;
     let images_transaction = pdb.get_images_transaction()
         .including_tags(&included_tags)
         .excluding_tags(&excluded_tags)
@@ -25,6 +25,7 @@ pub fn list_images(included_tags: &Vec<String>, excluded_tags: &Vec<String>, rat
 
     let images = images_transaction.execute()?;
 
+    let lib_dir = CONFIGURATION.library_path.as_path();
     match temp_dir {
         Some(path) => link_files_to_tmp_dir(&images, lib_dir, &path),
         None => print_file_paths(&images, lib_dir),

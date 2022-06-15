@@ -31,20 +31,20 @@ pub struct PantsuDB {
 impl PantsuDB {
 
     pub fn default() -> Result<PantsuDB, Error> {
-        let mut data_dir = file_handler::get_data_dir();
+        let mut data_dir = file_handler::default_db_dir();
         data_dir.push("pantsu_tags.db");
         PantsuDB::new(&data_dir)
     }
 
     pub fn new(db_path: &Path) -> Result<PantsuDB, Error> {
-        if db_path.eq(Path::new("/")) {
-            return Err(Error::InvalidDatabasePath(error::get_path(db_path)));
+        let mut path_buf = PathBuf::from(db_path);
+        if path_buf.exists() && path_buf.is_dir() {
+            path_buf.push("pantsu_tags.db");
         }
-        let path_buf = PathBuf::from(db_path);
         std::fs::create_dir_all(path_buf.parent().unwrap()).or_else(|e|
-            Err(Error::DirectoryCreateError(e, error::get_path(db_path)))
+            Err(Error::DirectoryCreateError(e, error::get_path(path_buf.as_path())))
         )?;
-        let conn = db_init::open(db_path)?;
+        let conn = db_init::open(path_buf.as_path())?;
         Ok(PantsuDB { conn })
     }
 

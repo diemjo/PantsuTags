@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::{PathBuf};
 
 use colored::Colorize;
 
@@ -6,6 +6,7 @@ use pantsu_tags::{Error, PantsuTagType};
 use pantsu_tags::db::PantsuDB;
 
 use crate::common::{AppResult, valid_filename_from_path};
+use crate::CONFIGURATION;
 
 pub fn list_tags(images: Vec<PathBuf>, tag_types: Vec<PantsuTagType>) -> AppResult<()> {
     if images.len() == 0 {
@@ -17,7 +18,7 @@ pub fn list_tags(images: Vec<PathBuf>, tag_types: Vec<PantsuTagType>) -> AppResu
 }
 
 fn list_tags_for_images(images: Vec<PathBuf>, tag_types: Vec<PantsuTagType>) -> AppResult<()> {
-    let db = PantsuDB::new(Path::new("./pantsu_tags.db"))?;
+    let db = PantsuDB::new(CONFIGURATION.database_path.as_path())?;
     let len = images.len();
     for (i, name) in images.into_iter().enumerate() {
         let image = valid_filename_from_path(name.as_path())?;
@@ -43,7 +44,7 @@ fn list_tags_for_images(images: Vec<PathBuf>, tag_types: Vec<PantsuTagType>) -> 
 }
 
 fn list_all_tags(tag_types: Vec<PantsuTagType>) -> AppResult<()> {
-    let db = PantsuDB::new(Path::new("./pantsu_tags.db"))?;
+    let db = PantsuDB::new(CONFIGURATION.database_path.as_path())?;
     let tags = db.get_tags_transaction()
         .with_types(&tag_types)
         .execute()?;

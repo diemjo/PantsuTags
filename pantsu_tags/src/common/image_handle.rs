@@ -1,4 +1,4 @@
-use std::fmt::{Debug, Display, format, Formatter, Pointer};
+use std::fmt::{Debug, Display, Formatter};
 use crate::LIB_PATH;
 use crate::Sauce::{NotExisting, NotChecked, Match};
 

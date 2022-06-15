@@ -1,3 +1,4 @@
+use std::env;
 use std::path::PathBuf;
 use directories::ProjectDirs;
 use regex::Regex;
@@ -10,7 +11,7 @@ pub(crate) struct ImageInfo {
     pub file_res: (u32, u32)
 }
 
-pub fn get_data_dir() -> PathBuf {
+pub fn default_db_dir() -> PathBuf {
     match ProjectDirs::from("moe", "karpador", "PantsuTags") {
         Some(project_dir) => {
             let mut path = PathBuf::new();
@@ -19,6 +20,10 @@ pub fn get_data_dir() -> PathBuf {
         },
         None => panic!("No valid home dir found")
     }
+}
+
+pub fn default_lib_dir() -> PathBuf {
+    PathBuf::from(env::var("HOME").unwrap()).join("Pictures").join("pantsulib")
 }
 
 pub fn filename_is_valid(name: &str) -> bool {

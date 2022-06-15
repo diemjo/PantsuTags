@@ -1,9 +1,9 @@
 use std::io;
-use std::path::{Path, PathBuf};
+use std::path::{PathBuf};
 use colored::Colorize;
 use pantsu_tags::{ImageHandle, Sauce, SauceMatch};
 use pantsu_tags::db::PantsuDB;
-use crate::{AppError, feh};
+use crate::{AppError, CONFIGURATION, feh};
 use crate::common::AppResult;
 use crate::feh::FehProcesses;
 
@@ -15,8 +15,7 @@ const RELEVANT_SIMILARITY_THESHOLD: i32 = 45;
 pub fn auto_add_tags(images: Vec<PathBuf>, no_feh: bool) -> AppResult<()> {
     let mut stats = AutoTaggingStats::default();
     let mut unsure_source_images: Vec<SauceUnsure> = Vec::new();
-    let pdb_path = Path::new("./pantsu_tags.db");
-    let mut pdb = PantsuDB::new(pdb_path)?;
+    let mut pdb = PantsuDB::new(CONFIGURATION.database_path.as_path())?;
     for image in &images {
         let image_name = image.to_str().unwrap_or("(can't display image name)");
         let res = auto_add_tags_one_image(&mut pdb, image_name);
@@ -43,7 +42,7 @@ pub fn auto_add_tags(images: Vec<PathBuf>, no_feh: bool) -> AppResult<()> {
                 });
                 println!("{} - {}", "Source could be wrong    ".yellow(), image_name);
             },
-            Err(e@AppError::StdinReadError(_)) => eprintln!("Unexpected error: {}", e),
+            Err(e) => eprintln!("Unexpected error: {}", e),
         }
     }
 

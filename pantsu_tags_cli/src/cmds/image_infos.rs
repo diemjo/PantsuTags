@@ -1,11 +1,11 @@
-use std::path::{Path, PathBuf};
+use std::path::{PathBuf};
 use colored::{Colorize};
 use pantsu_tags::db::PantsuDB;
 use crate::common::{AppResult, valid_filename_from_path};
+use crate::CONFIGURATION;
 
 pub fn image_infos(images: Vec<PathBuf>) -> AppResult<()> {
-    let pdb_path = Path::new("./pantsu_tags.db");
-    let pdb = PantsuDB::new(pdb_path)?;
+    let pdb = PantsuDB::new(CONFIGURATION.database_path.as_path())?;
     let images: Vec<String> = images.into_iter()
         .map(|i| valid_filename_from_path(i.as_path()))
         .collect::<AppResult<Vec<String>>>()?;
