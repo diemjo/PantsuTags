@@ -85,7 +85,7 @@ pub struct ListImagesArgs {
 pub struct AutoLookupTagsArgs {
     #[clap(short, long, parse(from_os_str))]
     pub images: Vec<PathBuf>,
-    #[clap(short, long)]
+    #[clap(long)]
     pub no_feh: bool,
 
     #[clap(short='s', long)]

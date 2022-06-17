@@ -1,5 +1,5 @@
-use clap::lazy_static::lazy_static;
 use clap::Parser;
+use lazy_static::lazy_static;
 
 use pantsu_tags::db::AspectRatio;
 

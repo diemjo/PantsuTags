@@ -17,3 +17,6 @@ pantsu_tags.db
 
 # test images
 test_image_*
+
+# completions
+pantsu-tags.bash
