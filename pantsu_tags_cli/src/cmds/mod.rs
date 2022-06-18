@@ -19,5 +19,5 @@ pub use add_tags::*;
 mod remove_tags;
 pub use remove_tags::*;
 
-mod autotags;
-pub use autotags::*;
+mod auto_lookup_tags;
+pub use auto_lookup_tags::*;

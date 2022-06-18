@@ -3,7 +3,7 @@ use lazy_static::lazy_static;
 
 use pantsu_tags::db::AspectRatio;
 
-use crate::cli::Args;
+use crate::cli::{Args};
 use crate::common::AppError;
 use crate::config::AppConfig;
 
@@ -48,7 +48,7 @@ fn main() -> Result<(), AppError> {
             }, args.sauce_existing, args.sauce_not_existing, args.sauce_not_checked, None)
         },
         Args::AutoLookupTags(args) => {
-            cmds::auto_add_tags(args.images, args.no_feh)
+            cmds::auto_lookup_tags(args.images, args.sauce_existing, args.sauce_not_existing, args.sauce_not_checked, args.no_feh)
         }
     };
 

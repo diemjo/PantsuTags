@@ -1,9 +1,9 @@
-use clap::{Parser, ArgGroup};
+use clap::{Parser, ArgGroup, AppSettings};
 use std::path::PathBuf;
 use pantsu_tags::{PantsuTag, PantsuTagType};
 
 #[derive(Debug, Parser)]
-#[clap(name = "PantsuTags", about = "PantsuTags CLI")]
+#[clap(name = "PantsuTags", about = "PantsuTags CLI", setting = AppSettings::SubcommandPrecedenceOverArg)]
 pub enum Args {
     ImportImages(ImportImagesArgs),
     RemoveImages(RemoveImagesArgs),
@@ -47,24 +47,24 @@ pub struct RemoveTagsArgs {
 
 #[derive(Debug, Parser)]
 pub struct ListTagsArgs {
-    #[clap(short, long, parse(from_os_str))]
+    #[clap(short, long, min_values(1), parse(from_os_str))]
     pub images: Vec<PathBuf>,
-    #[clap(short, long="types", parse(try_from_str))]
+    #[clap(short, long="types", min_values(1), parse(try_from_str))]
     pub tag_types: Vec<PantsuTagType>,
 }
 
 #[derive(Debug, Parser)]
 pub struct ImageInfosArgs {
-    #[clap(short, long, parse(from_os_str))]
+    #[clap(short, long, min_values(1), parse(from_os_str))]
     pub images: Vec<PathBuf>,
 }
 
 #[derive(Debug, Parser)]
 #[clap(group(ArgGroup::new("sauce").args(&["sauce-existing", "sauce-not-existing", "sauce-not-checked"])))]
 pub struct ListImagesArgs {
-    #[clap(short, long)]
+    #[clap(short, long, min_values(1))]
     pub include_tags: Vec<String>,
-    #[clap(short, long)]
+    #[clap(short, long, min_values(1))]
     pub exclude_tags: Vec<String>,
 
     #[clap(short='l', long)]
@@ -81,9 +81,9 @@ pub struct ListImagesArgs {
 }
 
 #[derive(Debug, Parser)]
-#[clap(group(ArgGroup::new("sauce").args(&["sauce-existing", "sauce-not-existing", "sauce-not-checked"])))]
+#[clap(group(ArgGroup::new("sauce").args(&["sauce-existing", "sauce-not-existing", "sauce-not-checked"])), arg_required_else_help = true)]
 pub struct AutoLookupTagsArgs {
-    #[clap(short, long, parse(from_os_str))]
+    #[clap(short, long, min_values(1), parse(from_os_str))]
     pub images: Vec<PathBuf>,
     #[clap(long)]
     pub no_feh: bool,
