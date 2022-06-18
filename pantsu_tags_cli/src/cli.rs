@@ -51,6 +51,9 @@ pub struct ListTagsArgs {
     pub images: Vec<PathBuf>,
     #[clap(short, long="types", min_values(1), parse(try_from_str))]
     pub tag_types: Vec<PantsuTagType>,
+
+    #[clap(short='p', long)]
+    pub print_tagnames: bool,
 }
 
 #[derive(Debug, Parser)]
@@ -71,6 +74,9 @@ pub struct ListImagesArgs {
     pub aspect_ratio_min: Option<f32>,
     #[clap(short='u', long)]
     pub aspect_ratio_max: Option<f32>,
+
+    #[clap(short='p', long)]
+    pub print_filenames: bool,
 
     #[clap(short='s', long)]
     pub sauce_existing: bool,

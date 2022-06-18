@@ -34,7 +34,7 @@ fn main() -> Result<(), AppError> {
             cmds::remove_tags(args.tags, args.images)
         },
         Args::ListTags(args) => {
-            cmds::list_tags(args.images, args.tag_types)
+            cmds::list_tags(args.images, args.tag_types, args.print_tagnames)
         },
         Args::ImageInfos(args) => {
             cmds::image_infos(args.images)
@@ -45,7 +45,7 @@ fn main() -> Result<(), AppError> {
                 (Some(min), None) => AspectRatio::Min(min),
                 (None, Some(max)) => AspectRatio::Max(max),
                 (None, None) => AspectRatio::Any,
-            }, args.sauce_existing, args.sauce_not_existing, args.sauce_not_checked, None)
+            }, args.print_filenames, args.sauce_existing, args.sauce_not_existing, args.sauce_not_checked, None)
         },
         Args::AutoLookupTags(args) => {
             cmds::auto_lookup_tags(args.images, args.sauce_existing, args.sauce_not_existing, args.sauce_not_checked, args.no_feh)

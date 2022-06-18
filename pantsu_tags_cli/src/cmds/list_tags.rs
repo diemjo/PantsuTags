@@ -8,16 +8,16 @@ use pantsu_tags::db::PantsuDB;
 use crate::common::{AppResult, valid_filename_from_path};
 use crate::CONFIGURATION;
 
-pub fn list_tags(images: Vec<PathBuf>, tag_types: Vec<PantsuTagType>) -> AppResult<()> {
+pub fn list_tags(images: Vec<PathBuf>, tag_types: Vec<PantsuTagType>, do_print_tagnames: bool) -> AppResult<()> {
     if images.len() == 0 {
-        list_all_tags(tag_types)?;
+        list_all_tags(tag_types, do_print_tagnames)?;
     } else {
-        list_tags_for_images(images, tag_types)?;
+        list_tags_for_images(images, tag_types, do_print_tagnames)?;
     }
     Ok(())
 }
 
-fn list_tags_for_images(images: Vec<PathBuf>, tag_types: Vec<PantsuTagType>) -> AppResult<()> {
+fn list_tags_for_images(images: Vec<PathBuf>, tag_types: Vec<PantsuTagType>, do_print_tagnames: bool) -> AppResult<()> {
     let db = PantsuDB::new(CONFIGURATION.database_path.as_path())?;
     let len = images.len();
     for (i, name) in images.into_iter().enumerate() {
@@ -34,7 +34,7 @@ fn list_tags_for_images(images: Vec<PathBuf>, tag_types: Vec<PantsuTagType>) -> 
             println!("{}:", image.get_filename().green());
         }
         for tag in tags {
-            println!("{}", tag.to_string());
+            println!("{}", if do_print_tagnames { tag.tag_name } else { tag.to_string() } );
         }
         if i<len-1 {
             println!();
@@ -43,13 +43,13 @@ fn list_tags_for_images(images: Vec<PathBuf>, tag_types: Vec<PantsuTagType>) -> 
     Ok(())
 }
 
-fn list_all_tags(tag_types: Vec<PantsuTagType>) -> AppResult<()> {
+fn list_all_tags(tag_types: Vec<PantsuTagType>, do_print_tagnames: bool) -> AppResult<()> {
     let db = PantsuDB::new(CONFIGURATION.database_path.as_path())?;
     let tags = db.get_tags_transaction()
         .with_types(&tag_types)
         .execute()?;
     for tag in tags {
-        println!("{}", tag)
+        println!("{}", if do_print_tagnames { tag.tag_name } else { tag.to_string() } )
     }
     Ok(())
 }

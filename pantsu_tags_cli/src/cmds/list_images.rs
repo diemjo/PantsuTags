@@ -4,7 +4,7 @@ use pantsu_tags::{Error, ImageHandle};
 use crate::common::AppResult;
 use crate::CONFIGURATION;
 
-pub fn list_images(included_tags: &Vec<String>, excluded_tags: &Vec<String>, ratio: AspectRatio,
+pub fn list_images(included_tags: &Vec<String>, excluded_tags: &Vec<String>, ratio: AspectRatio, do_print_filenames: bool,
                    sauce_existing: bool, sauce_not_existing: bool, sauce_not_checked: bool,
                    temp_dir: Option<PathBuf>) -> AppResult<()> {
     let pdb = PantsuDB::new(CONFIGURATION.database_path.as_path())?;
@@ -28,7 +28,10 @@ pub fn list_images(included_tags: &Vec<String>, excluded_tags: &Vec<String>, rat
     let lib_dir = CONFIGURATION.library_path.as_path();
     match temp_dir {
         Some(path) => link_files_to_tmp_dir(&images, lib_dir, &path),
-        None => print_file_paths(&images, lib_dir),
+        None => match do_print_filenames {
+            false => print_file_paths(&images, lib_dir),
+            true => print_filenames(&images),
+        }
     }
 }
 
@@ -50,6 +53,13 @@ fn link_files_to_tmp_dir(files: &Vec<ImageHandle>, lib_dir: &Path, tmp_path: &Pa
 fn print_file_paths(files: &Vec<ImageHandle>, lib_dir: &Path) -> AppResult<()> {
     for p in get_file_paths(files, lib_dir)? {
         println!("{}", p.to_str().unwrap())
+    }
+    Ok(())
+}
+
+fn print_filenames(images: &Vec<ImageHandle>) -> AppResult<()> {
+    for image in images {
+        println!("{}", image.get_filename())
     }
     Ok(())
 }
