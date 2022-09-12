@@ -1,11 +1,13 @@
 use std::fmt::Debug;
+use std::hash::Hash;
 use rusqlite::ToSql;
 use rusqlite::types::{FromSql, FromSqlResult, ToSqlOutput, ValueRef};
+use crate::image_similarity::NamedImage;
 use crate::LIB_PATH;
 use crate::Sauce::{NotExisting, NotChecked, Match};
 
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct ImageHandle {
     filename: String,
     file_source: Sauce,
@@ -36,7 +38,13 @@ impl ImageHandle {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+impl NamedImage for ImageHandle {
+    fn get_name(&self) -> &str {
+        self.get_filename()
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum Sauce {
     Match(String),
     NotExisting,

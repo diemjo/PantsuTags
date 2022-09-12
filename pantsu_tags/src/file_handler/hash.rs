@@ -7,7 +7,6 @@ use crate::common::error;
 use crate::common::error::Result;
 use crate::common::error::Error;
 use crate::file_handler::ImageInfo;
-use crate::ImageHandle;
 
 struct AdapterImage<'a> {
     pub image: &'a DynamicImage,
@@ -41,18 +40,7 @@ pub(crate) fn calculate_fileinfo(path: &Path) -> Result<ImageInfo> {
     })
 }
 
-pub fn get_similarity_distances<'a>(filename: &str, files: &Vec<&'a str>, max_dist: u32) -> Result<Vec<&'a str>> {
-    let file_hash = extract_hash(filename)?;
-    Ok(files.iter()
-        .map(|&file| file)
-        .filter(|&file|{
-            let p_hash = extract_hash(file).unwrap();
-            let dist = file_hash.distance(&p_hash);
-            dist < max_dist && file!=filename
-        }).collect::<Vec<&str>>())
-}
-
-fn extract_hash(filename: &str) -> Result<Blockhash144> {
+pub(crate) fn extract_hash(filename: &str) -> Result<Blockhash144> {
     let filename = filename.trim();
     if !super::filename_is_valid(filename) {
         return Err(Error::InvalidFilename(String::from(filename)))
