@@ -1,4 +1,6 @@
 use std::fmt::{Debug, Display, Formatter};
+use std::hash::Hash;
+use crate::image_similarity::NamedImage;
 use crate::LIB_PATH;
 use crate::Sauce::{NotExisting, NotChecked, Match};
 
@@ -41,6 +43,12 @@ impl Display for ImageHandle {
             NotExisting => NOT_EXISTING_FLAG,
             NotChecked => NOT_CHECKED_FLAG,
         })
+    }
+}
+
+impl NamedImage for ImageHandle {
+    fn get_name(&self) -> &str {
+        self.get_filename()
     }
 }
 
