@@ -5,10 +5,9 @@ use crate::db::sqlite_statements;
 
 pub fn open(db_path: &Path) -> Result<Connection, Error> {
     let pantsu_db_updates: Vec<&dyn Fn(&mut Connection) -> Result<(), Error>> = vec![
-        &db_init_1,
         //eg: &db_update_1_2,
     ];
-    let  pantsu_db_version = pantsu_db_updates.len();
+    let pantsu_db_newest_version = pantsu_db_updates.len() + 1;
 
     let mut conn = match Connection::open_with_flags(db_path, OpenFlags::SQLITE_OPEN_READ_WRITE) {
         Ok(conn) => conn,
@@ -20,13 +19,18 @@ pub fn open(db_path: &Path) -> Result<Connection, Error> {
             conn
         }
     };
-    let old_db_version = conn.pragma_query_value(None, "user_version", |r| r.get(0))?;
-    if pantsu_db_version < old_db_version {
-        return Err(Error::ProgramOutdated(format!("Expected database version <={} but found version {}", pantsu_db_version, old_db_version)));
-    } else if pantsu_db_version > old_db_version {
-        for i in old_db_version..pantsu_db_version {
-            pantsu_db_updates[i](&mut conn)?;
-            conn.pragma_update(None, "user_version", i+1)?;
+    let current_db_version = conn.pragma_query_value(None, "user_version", |r| r.get(0))?;
+    if pantsu_db_newest_version < current_db_version {
+        return Err(Error::ProgramOutdated(format!("Expected database version <={} but found version {}", pantsu_db_newest_version, current_db_version)));
+    } else if pantsu_db_newest_version > current_db_version {
+        if current_db_version == 0 {
+            db_init_new(&mut conn)?;
+            conn.pragma_update(None, "user_version", pantsu_db_newest_version)?;
+        } else {
+            for i in current_db_version..pantsu_db_newest_version {
+                pantsu_db_updates[i-1](&mut conn)?;
+                conn.pragma_update(None, "user_version", i + 1)?;
+            }
         }
     } else {
         //println!("opened database with version {}", pantsu_db_version);
@@ -34,8 +38,8 @@ pub fn open(db_path: &Path) -> Result<Connection, Error> {
     Ok(conn)
 }
 
-fn db_init_1(connection: &mut Connection) -> Result<(), Error> {
-    println!("Initializing database version 1");
+fn db_init_new(connection: &mut Connection) -> Result<(), Error> {
+    println!("Initializing database");
     connection.execute_batch(sqlite_statements::DB_INIT_TABLES)?;
     Ok(())
 }
