@@ -41,10 +41,6 @@ pub fn auto_lookup_tags(image_paths: Vec<PathBuf>, sauce_existing: bool, sauce_n
             e@Err(AppError::LibError(_)) => {
                 return e;
             }
-            Err(AppError::ImageNotFound(_)) => {
-                stats.not_found += 1;
-                println!("{} - {}", "Image not found          ", image.get_filename());
-            }
             Err(AppError::NoRelevantSauces) => {
                 stats.no_source += 1;
                 println!("{} - {}", "No source found          ".red(), image.get_filename());
@@ -159,7 +155,6 @@ fn resolve_sauce_unsure(pdb: &mut PantsuDB, images_to_resolve: Vec<SauceUnsure>,
 struct AutoTaggingStats {
     success: u64,
     no_source: u64,
-    not_found: u64,
 }
 impl AutoTaggingStats {
     fn print_stats(&self) {
@@ -168,9 +163,6 @@ impl AutoTaggingStats {
         }
         if self.no_source > 0 {
             println!("Source not found:    {}", self.no_source);
-        }
-        if self.not_found > 0 {
-            println!("Image not found:     {}", self.not_found);
         }
     }
 }
