@@ -25,31 +25,33 @@ pub fn feh_available() -> bool {
 
 //feh --info 'echo "$((%u -1))"' https://img3.gelbooru.com/images/bb/62/bb626c2a621cbc1642256c0ebefbd219.jpg https://img3.gelbooru.com/images/12/ee/12ee1ac61779f5ccfcc383485c7c3191.png
 
-pub fn feh_compare_image(image: &str, other_images: &Vec<&str>, image_label: &str, other_images_label: &str) -> FehProcesses {
-    let command_image = format!("feh -q.ZB black --info \'echo \"{}\"\' \'{}\'", image_label, image);
-
-    let mut command_other_images = format!("feh -q.ZB black --info \'echo \"$((%u -1)) {}\"\'", other_images_label);
-    for &image in other_images {
-        command_other_images.push_str(" \'");
-        command_other_images.push_str(&image);
-        command_other_images.push('\'');
-    }
-
-    let mut cmd_image = match spawn_process(&command_image) {
-        Ok(cmd) => cmd,
-        Err(_) => return FehProcesses::new_empty(),
-    };
-
-    let cmd_other_images = match spawn_process(&command_other_images) {
-        Ok(cmd) => cmd,
+// if no FehProcesses is available, create an new one with FehProcesses::new_empty()
+pub fn feh_display_images<'a, I>(images: I, label: &str, mut feh_procs: FehProcesses) -> FehProcesses
+where I: Iterator<Item = &'a str>
+{
+    let cmd = make_feh_command(images, label);
+    match spawn_process(&cmd) {
+        Ok(proc) => {
+            feh_procs.processes.push(proc);
+            feh_procs
+        },
         Err(_) => {
-            let _ = cmd_image.kill();
-            return FehProcesses::new_empty();
-        }
-    };
-    FehProcesses {
-        processes: vec![cmd_image, cmd_other_images]
+            feh_procs.kill();
+            FehProcesses::new_empty()
+        },
     }
+}
+
+fn make_feh_command<'a, I>(images: I, label: &str) -> String
+where I: Iterator<Item = &'a str>
+{
+    let mut cmd = format!("feh -q.ZB black --info \'echo \"%u/%l {}\"\'", label);
+    for image in images {
+        cmd.push_str(" \'");
+        cmd.push_str(image);
+        cmd.push('\'');
+    }
+    cmd
 }
 
 fn spawn_process(command: &str) -> io::Result<Child>{

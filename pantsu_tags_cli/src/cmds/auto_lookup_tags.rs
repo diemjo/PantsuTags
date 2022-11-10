@@ -1,5 +1,5 @@
 use std::collections::HashSet;
-use std::io;
+use std::{io, iter};
 use std::path::{PathBuf};
 use colored::Colorize;
 use pantsu_tags::{ImageHandle, Sauce, SauceMatch};
@@ -80,7 +80,6 @@ fn auto_add_tags_one_image(pdb: &mut PantsuDB, image: &ImageHandle) -> AppResult
                     .execute()?;
             }
             else { // tags can be added in the sauce resolution
-                // todo: maybe add Sauce::NotChecked
                 return Err(AppError::SauceUnsure(image.clone(), relevant_sauces));
             }
         }
@@ -102,14 +101,15 @@ fn resolve_sauce_unsure(pdb: &mut PantsuDB, images_to_resolve: Vec<SauceUnsure>,
     let use_feh = !no_feh && feh::feh_available();
     let mut input = String::new();
     let stdin = io::stdin();
+    let lib_path = CONFIGURATION.library_path.as_path();
     println!("\n\nResolving {} images with unsure sources manually:", images_to_resolve.len());
-    for image in images_to_resolve {
-        let image_path = image.image_handle.get_path(CONFIGURATION.library_path.as_path());
+    for (image_idx, image) in images_to_resolve.iter().enumerate() {
+        let image_path = image.image_handle.get_path(lib_path);
         let mut thumbnails = ThumbnailDisplayer::new(use_feh);
-        println!("\nImage {}:\n", image_path);
+        println!("\nImage {} of {}:\n{}\n", image_idx+1, images_to_resolve.len(), image_path);
         for (index, sauce) in image.matches.iter().enumerate() {
             thumbnails.add_thumbnail_link(sauce);
-            println!("{} - {}", index, sauce.link);
+            println!("{} - {}", index+1, sauce.link);
         }
         thumbnails.feh_display(&image_path);
         loop {
@@ -119,11 +119,11 @@ fn resolve_sauce_unsure(pdb: &mut PantsuDB, images_to_resolve: Vec<SauceUnsure>,
             stdin.read_line(&mut input).or_else(|e| Err(AppError::StdinReadError(e)))?;
             let input = input.trim();
             if let Ok(num) = input.parse::<usize>() {
-                if num >= image.matches.len() {
-                    println!("Number too big, the last source has number {}", image.matches.len()-1);
+                if num == 0 || num > image.matches.len() {
+                    println!("Invalid image number, must be in range 1 to {}", image.matches.len());
                     continue;
                 }
-                let correct_sauce = &image.matches[num];
+                let correct_sauce = &image.matches[num-1];
                 let tags = pantsu_tags::get_sauce_tags(correct_sauce)?;
                 pdb.update_images_transaction()
                     .for_image(image.image_handle.get_filename())
@@ -212,13 +212,10 @@ impl ThumbnailDisplayer {
         if !self.enabled {
             return;
         }
-        let links = self.thumbnail_links.iter().map(|s| s.as_str()).collect();
-        self.feh_processes = Some(feh::feh_compare_image(
-            image_path,
-            &links,
-            "Original",
-            "Potential Source"
-        ));
+        let links = self.thumbnail_links.iter().map(|s| s.as_str());
+        let mut procs = self.feh_processes.take().unwrap_or(FehProcesses::new_empty());
+        procs = feh::feh_display_images(iter::once(image_path), "Local image", procs);
+        self.feh_processes = Some(feh::feh_display_images(links, "Potential source", procs));
     }
 
     fn kill_feh(&mut self) {

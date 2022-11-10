@@ -73,16 +73,17 @@ fn resolve_similar_image_groups(pdb: &mut PantsuDB, similar_images_groups: Vec<S
         let new_images = &group.new_images;
         for (idx, new_img) in new_images.iter().enumerate() {
             let image_name = new_img.current_path.to_str().unwrap_or("(can't display image name)");
-            println!("{} - {}", idx, image_name)
+            println!("{} - {}", idx+1, image_name)
         }
-        println!("\nImages already in PantsuTags:");
-        for old_img in &group.old_images {
-            let image_name = old_img.get_filename();
-            println!(" - {}", image_name)
+        if !group.old_images.is_empty() {
+            println!("\nImages already in PantsuTags:");
+            for old_img in &group.old_images {
+                let image_name = old_img.get_filename();
+                println!(" - {}", image_name)
+            }
         }
 
-        // todo: dispaly images in feh
-        //let procs = feh_display_similar(image_name, &case.similar_images, use_feh);
+        let procs = feh_display_similar(group, use_feh);
         loop {
             println!("Enter the numbers of the new images that should be added to PantsuTags.");
             input.clear();
@@ -94,10 +95,10 @@ fn resolve_similar_image_groups(pdb: &mut PantsuDB, similar_images_groups: Vec<S
 
             if let Ok(numbers) = input_numbers { // todo: no input adds no images, maybe make clearer?
                 let num_new_images = new_images.len();
-                if numbers.iter().all(|&num| num < num_new_images) {
+                if numbers.iter().all(|&num| num <= num_new_images) {
                     for (idx, new_image) in new_images.iter().enumerate() {
                         let image_name = new_image.current_path.to_str().unwrap_or("(can't display image name)");
-                        if numbers.iter().any(|&num| idx == num) {
+                        if numbers.iter().any(|&num| idx == num-1) {
                             match pantsu_tags::import_image(pdb, CONFIGURATION.library_path.as_path(), new_image, always_copy_images) {
                                 Ok(_) => {
                                     stats.similar_imported += 1;
@@ -116,7 +117,7 @@ fn resolve_similar_image_groups(pdb: &mut PantsuDB, similar_images_groups: Vec<S
 
                     break;
                 } else {
-                    println!("Invalid input: the highest image number is {}", num_new_images - 1);
+                    println!("Invalid input: the highest image number is {}", num_new_images);
                     continue;
                 }
             }
@@ -124,70 +125,31 @@ fn resolve_similar_image_groups(pdb: &mut PantsuDB, similar_images_groups: Vec<S
             println!("Invalid input");
         }
 
-        //procs.kill();
-    }
-    Ok(())
-}
-
-// todo: remove
-/*
-fn resolve_similar_images(pdb: &mut PantsuDB, images_to_resolve: Vec<SimilarImagesExistCase>, stats: &mut ImportStats, no_feh: bool) -> AppResult<()> {
-    if images_to_resolve.is_empty() {
-        return Ok(());
-    }
-    let use_feh = !no_feh && feh::feh_available();
-    let mut input = String::new();
-    let stdin = io::stdin();
-    println!("\n\nResolving {} images which are similar to images in PantsuTags:", images_to_resolve.len());
-    for case in &images_to_resolve {
-        let image_name = case.new_image_path.to_str().unwrap_or("(can't display image name)");
-        println!("\nImage {} is similar to", image_name);
-        for similar_img in &case.similar_images {
-            println!(" - {}", similar_img.get_filename());
-        }
-        let procs = feh_display_similar(image_name, &case.similar_images, use_feh);
-        println!("Do you still want to add the new image to PantsuTags?");
-        println!("[y/N]");
-        input.clear();
-        stdin.read_line(&mut input).or_else(|e| Err(AppError::StdinReadError(e)))?;
-        let input = input.trim();
-        if input.eq_ignore_ascii_case("y")  {
-            match pantsu_tags::new_image_handle(pdb, &case.new_image_path, false) {
-                Ok(_) => {
-                    stats.similar_imported += 1;
-                    println!("Imported new image");
-                },
-                Err(e) => {
-                    eprintln!("Failed to import new image, Error: {}", e);
-                }
-            }
-        }
-        else {
-            stats.similar_not_imported += 1;
-            println!("New image {} imported", "was not".bold());
-        }
         procs.kill();
     }
     Ok(())
 }
-*/
 
-// todo: remove or adapt
-/*
-fn feh_display_similar(image_path: &str, similar_images: &Vec<ImageHandle>, use_feh: bool) -> FehProcesses {
-    if use_feh {
-        let similar_images: Vec<String> = similar_images.iter().map(|img| img.get_path()).collect();
-        let similar_images = similar_images.iter().map(|path| path.as_str()).collect();
-        return feh::feh_compare_image(
-            image_path,
-            &similar_images,
-            "New image",
-            "Similar image already stored in PantsuTags"
-        );
+fn feh_display_similar(similar_images: &SimilarImagesGroup, use_feh: bool) -> FehProcesses  {
+    let mut feh_proc = FehProcesses::new_empty();
+    if !use_feh {
+        return feh_proc;
     }
-    FehProcesses::new_empty()
+
+    feh_proc = feh::feh_display_images(similar_images.new_images.iter().map(|img| img.current_path.to_str().unwrap_or("(can't display image name)")),
+                            "New image", feh_proc);
+
+    if !similar_images.old_images.is_empty() {
+        let lib_path = CONFIGURATION.library_path.as_path();
+        // store as vector since we need to pass a &str iterator to feh_display_images()
+        let old_images: Vec<String> = similar_images.old_images.iter()
+            .map(|img| img.get_path(lib_path)).collect();
+        print!("{:#?}", old_images);
+        feh_proc = feh::feh_display_images(old_images.iter().map(|img| img.as_str()),
+                                "Image already stored in PantsuTags", feh_proc)
+    }
+    feh_proc
 }
-*/
 
 #[derive(Default)]
 struct ImportStats {

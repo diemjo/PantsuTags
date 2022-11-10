@@ -25,7 +25,7 @@ impl ImageHandle {
         self.filename.as_str()
     }
 
-    pub fn get_path(&self, lib_path: &Path) -> String { format!("{}{}", lib_path.to_str().unwrap(), self.filename.as_str()) }
+    pub fn get_path(&self, lib_path: &Path) -> String { format!("{}/{}", lib_path.to_str().unwrap(), self.filename.as_str()) }
 
     pub fn get_sauce(&self) -> &Sauce {
         &self.file_source
