@@ -52,6 +52,9 @@ pub enum Error {
     #[error("File has invalid name: {0}")]
     InvalidFilename(String),
 
+    #[error("Cannot copy file '{1}' into image library: {0}")]
+    CopyError(#[source] std::io::Error, String),
+
     #[error("Cannot hard link file '{1}' into image library: {0}")]
     HardLinkError(#[source] std::io::Error, String),
 

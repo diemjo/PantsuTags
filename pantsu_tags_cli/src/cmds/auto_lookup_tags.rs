@@ -67,7 +67,7 @@ pub fn auto_lookup_tags(image_paths: Vec<PathBuf>, sauce_existing: bool, sauce_n
 }
 
 fn auto_add_tags_one_image(pdb: &mut PantsuDB, image: &ImageHandle) -> AppResult<()> {
-    let sauces = pantsu_tags::get_image_sauces(&image)?;
+    let sauces = pantsu_tags::get_image_sauces(CONFIGURATION.library_path.as_path(), &image)?;
     let relevant_sauces: Vec<SauceMatch> = sauces.into_iter().filter(|s| s.similarity > RELEVANT_SIMILARITY_THESHOLD).collect();
     match relevant_sauces.first() {
         Some(sauce) => {
@@ -104,7 +104,7 @@ fn resolve_sauce_unsure(pdb: &mut PantsuDB, images_to_resolve: Vec<SauceUnsure>,
     let stdin = io::stdin();
     println!("\n\nResolving {} images with unsure sources manually:", images_to_resolve.len());
     for image in images_to_resolve {
-        let image_path = image.image_handle.get_path();
+        let image_path = image.image_handle.get_path(CONFIGURATION.library_path.as_path());
         let mut thumbnails = ThumbnailDisplayer::new(use_feh);
         println!("\nImage {}:\n", image_path);
         for (index, sauce) in image.matches.iter().enumerate() {

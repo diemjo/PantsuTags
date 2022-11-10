@@ -34,7 +34,7 @@ pub fn filename_is_valid(name: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use std::io::Cursor;
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
     use crate::file_handler::hash;
     use crate::file_handler::{filename_is_valid, import};
 
@@ -67,8 +67,8 @@ mod tests {
         let file = "https://img1.gelbooru.com/images/4f/76/4f76b8d52983af1d28b1bf8d830d684e.png";
         let file_path = prepare_image(file);
         let new_filename = hash::calculate_fileinfo(&file_path).unwrap().filename;
-        let lib_dir = "./";
-        import::import_file(lib_dir, &file_path, &new_filename).unwrap();
+        let lib_dir = Path::new("./");
+        import::import_file(lib_dir, &file_path, &new_filename, false).unwrap();
         let mut new_path = PathBuf::from(lib_dir);
         new_path.push(new_filename);
         assert!(new_path.exists());

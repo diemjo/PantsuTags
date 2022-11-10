@@ -18,8 +18,6 @@ pub mod image_similarity;
 pub mod db;
 pub mod file_handler;
 
-pub const LIB_PATH: &str = "./test_image_lib/";
-
 // This check can fail with Error::ImageLoadError or Error:ImageAlreadyExists
 pub fn check_image(pantsu_db: &mut PantsuDB, image_path: &Path) -> Result<ImageToImport> {
     let image_info = file_handler::hash::calculate_fileinfo(image_path)?;
@@ -33,14 +31,15 @@ pub fn check_image(pantsu_db: &mut PantsuDB, image_path: &Path) -> Result<ImageT
     } )
 }
 
-pub fn import_image(pantsu_db: &mut PantsuDB, image: &ImageToImport) -> Result<()> { // todo: could consume imageToImport
-    import::import_file(LIB_PATH, &image.current_path, image.image_handle.get_filename())?;
+pub fn import_image(pantsu_db: &mut PantsuDB, lib: &Path, image: &ImageToImport, always_copy: bool) -> Result<()> { // todo: could consume imageToImport
+    import::import_file(lib, &image.current_path, image.image_handle.get_filename(), always_copy)?;
     pantsu_db.add_images_transaction().add_image(&image.image_handle).execute()
 }
 
 
-pub fn get_image_sauces(image: &ImageHandle) -> Result<Vec<SauceMatch>> {
-    let image_path = PathBuf::from(format!("./test_image_lib/{}", image.get_filename()));
+pub fn get_image_sauces(lib: &Path, image: &ImageHandle) -> Result<Vec<SauceMatch>> {
+    let mut image_path = PathBuf::from(lib);
+    image_path.push(image.get_filename());
     let mut sauce_matches = sauce::find_sauce(&image_path)?;
     sauce_matches.sort();
     sauce_matches.reverse();
@@ -54,7 +53,7 @@ pub fn get_sauce_tags(sauce: &SauceMatch) -> Result<Vec<PantsuTag>> {
 #[cfg(test)]
 mod tests {
     use std::io::Cursor;
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
     use crate::{PantsuDB, Sauce};
     use serial_test::serial;
     use crate::image_similarity::NamedImage;
@@ -68,8 +67,8 @@ mod tests {
         let image_path = prepare_image("https://img1.gelbooru.com/images/4f/76/4f76b8d52983af1d28b1bf8d830d684e.png");
 
         let new_image = crate::check_image(&mut pdb, &image_path).unwrap();
-        crate::import_image(&mut pdb, &new_image).unwrap();
-        let sauces = crate::get_image_sauces(&new_image.image_handle).unwrap();
+        crate::import_image(&mut pdb, Path::new("./test_image_lib"), &new_image, true).unwrap();
+        let sauces = crate::get_image_sauces(Path::new("./test_image_lib"), &new_image.image_handle).unwrap();
         let best_match = &sauces[0];
         // in general, you would want to check the similarity here
         let tags = crate::get_sauce_tags(&best_match).unwrap();
@@ -89,11 +88,11 @@ mod tests {
         pdb.clear().unwrap();
 
         let image = crate::check_image(&mut pdb, &image_path).unwrap();
-        crate::import_image(&mut pdb, &image).unwrap();
+        crate::import_image(&mut pdb, Path::new("./test_image_lib"), &image, false).unwrap();
         let not_similar_image = crate::check_image(&mut pdb, &not_similar_image_path).unwrap();
-        crate::import_image(&mut pdb, &not_similar_image).unwrap();
+        crate::import_image(&mut pdb, Path::new("./test_image_lib"), &not_similar_image, false).unwrap();
         let similar_image = crate::check_image(&mut pdb, &similar_image_path).unwrap();
-        crate::import_image(&mut pdb, &similar_image).unwrap();
+        crate::import_image(&mut pdb, Path::new("./test_image_lib"), &similar_image, false).unwrap();
     }
 
     fn prepare_image(image_link: &str) -> PathBuf {

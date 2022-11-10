@@ -19,6 +19,8 @@ pub enum Args {
 pub struct ImportImagesArgs {
     #[clap(parse(from_os_str), required=true, min_values=1)]
     pub images: Vec<PathBuf>,
+    #[clap(short='c', long)]
+    pub always_copy_images: bool,
     #[clap(short, long)]
     pub no_feh: bool
 }

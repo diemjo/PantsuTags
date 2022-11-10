@@ -22,7 +22,7 @@ fn main() -> Result<(), AppError> {
     //println!("Got arguments {:?}", args);
     let res: Result<(), AppError> = match args {
         Args::ImportImages(args) => {
-            cmds::import_images(args.no_feh, args.images)
+            cmds::import_images(args.no_feh, args.images, args.always_copy_images)
         },
         Args::RemoveImages(args) => {
             cmds::remove_images(args.images)

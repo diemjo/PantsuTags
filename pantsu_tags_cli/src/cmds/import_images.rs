@@ -9,10 +9,11 @@ use crate::common::{AppError, AppResult};
 use crate::{CONFIGURATION, feh};
 use crate::feh::FehProcesses;
 
-pub fn import_images(no_feh: bool, images: Vec<PathBuf>) -> AppResult<()> {
+pub fn import_images(no_feh: bool, images: Vec<PathBuf>, always_copy_images: bool) -> AppResult<()> {
     let mut import_stats = ImportStats::default();
     let mut valid_images: Vec<ImageToImport> = Vec::new();
     let mut pdb = PantsuDB::new(CONFIGURATION.database_path.as_path())?;
+
     for image in &images {
         let image_name = image.to_str().unwrap_or("(can't display image name)");
         match pantsu_tags::check_image(&mut pdb, image) {
@@ -37,7 +38,7 @@ pub fn import_images(no_feh: bool, images: Vec<PathBuf>) -> AppResult<()> {
     for group in image_groups {
         if group.is_single_image() {
             let image = group.new_images.into_iter().next().unwrap();
-            pantsu_tags::import_image(&mut pdb, image).unwrap(); // todo: handle error
+            pantsu_tags::import_image(&mut pdb, CONFIGURATION.library_path.as_path(), image, always_copy_images).unwrap(); // todo: handle error
             import_stats.success += 1;
             let image_name = image.current_path.to_str().unwrap_or("(can't display image name)");
             println!("{} - {}", "Successfully imported image".green(), image_name);
@@ -51,13 +52,13 @@ pub fn import_images(no_feh: bool, images: Vec<PathBuf>) -> AppResult<()> {
         }
     }
 
-    resolve_similar_image_groups(&mut pdb, image_groups_with_similars, &mut import_stats, no_feh)?;
+    resolve_similar_image_groups(&mut pdb, image_groups_with_similars, &mut import_stats, always_copy_images, no_feh)?;
     println!();
     import_stats.print_stats();
     Ok(())
 }
 
-fn resolve_similar_image_groups(pdb: &mut PantsuDB, similar_images_groups: Vec<SimilarImagesGroup>, stats: &mut ImportStats, no_feh: bool) -> AppResult<()> {
+fn resolve_similar_image_groups(pdb: &mut PantsuDB, similar_images_groups: Vec<SimilarImagesGroup>, stats: &mut ImportStats, always_copy_images: bool, no_feh: bool) -> AppResult<()> {
     if similar_images_groups.is_empty() {
         return Ok(());
     }
@@ -97,7 +98,7 @@ fn resolve_similar_image_groups(pdb: &mut PantsuDB, similar_images_groups: Vec<S
                     for (idx, new_image) in new_images.iter().enumerate() {
                         let image_name = new_image.current_path.to_str().unwrap_or("(can't display image name)");
                         if numbers.iter().any(|&num| idx == num) {
-                            match pantsu_tags::import_image(pdb, new_image) {
+                            match pantsu_tags::import_image(pdb, CONFIGURATION.library_path.as_path(), new_image, always_copy_images) {
                                 Ok(_) => {
                                     stats.similar_imported += 1;
                                     println!("Imported new image {}: {}", idx, image_name)
