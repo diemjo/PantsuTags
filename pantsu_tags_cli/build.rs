@@ -6,6 +6,7 @@ use clap_generate::generators::{Bash, generate_to};
 include!("src/cli.rs");
 
 fn main() -> Result<(), Box<dyn Error>>{
+    println!("cargo:rerun-if-changed=./src/cli.rs");
     let mut app = Args::into_app();
     let outdir = Path::new(env!("CARGO_MANIFEST_DIR")).join("completions/");
     fs::create_dir_all(&outdir)?;

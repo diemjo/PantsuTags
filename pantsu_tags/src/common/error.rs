@@ -66,4 +66,7 @@ pub enum Error {
 
     #[error("'{0}' is not a file")]
     InvalidDatabasePath(String),
+
+    #[error("'{0}' is not formatted correctly as an import file")]
+    InvalidImportFileFormat(String),
 }

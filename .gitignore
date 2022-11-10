@@ -19,4 +19,7 @@ pantsu_tags.db
 test_image_*
 
 # completions
-pantsu-tags.bash
+completions/
+
+# config file
+pantsu_tags.yaml
