@@ -4,12 +4,22 @@ use pantsu_tags::ImageHandle;
 
 pub type AppResult<T> = std::result::Result<T, AppError>;
 
+pub fn get_path(path: &Path) -> String {
+    String::from(path.to_str().unwrap_or("cannot display path"))
+}
+
+pub fn get_filename(path: &Path) -> AppResult<String> {
+    match path.file_name() {
+        Some(name) => match name.to_str() {
+            Some(name) => Ok(String::from(name)),
+            None => Err(Error::InvalidFilename(get_path(path)))?,
+        },
+        None => Err(Error::InvalidFilename(get_path(path)))?
+    }
+}
+
 pub fn valid_filename_from_path(path: &Path) -> AppResult<String> {
-    let filename = path
-        .file_name()
-        .ok_or(Error::InvalidFilename(path.to_string_lossy().to_string()))?
-        .to_string_lossy()
-        .to_string();
+    let filename = get_filename(path)?;
     if !file_handler::filename_is_valid(filename.as_str()) {
         Err(Error::InvalidFilename(filename))?
     } else {

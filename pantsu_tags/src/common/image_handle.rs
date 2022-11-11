@@ -1,7 +1,7 @@
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::Hash;
 use std::path::Path;
-use crate::error;
+use crate::common;
 use crate::image_similarity::NamedImage;
 use crate::Sauce::{NotExisting, NotChecked, Match};
 
@@ -26,7 +26,7 @@ impl ImageHandle {
         self.filename.as_str()
     }
 
-    pub fn get_path(&self, lib_path: &Path) -> String { error::get_path(&lib_path.join(&self.filename)) }
+    pub fn get_path(&self, lib_path: &Path) -> String { common::get_path(&lib_path.join(&self.filename)) }
 
     pub fn get_sauce(&self) -> &Sauce {
         &self.file_source

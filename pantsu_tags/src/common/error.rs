@@ -1,10 +1,6 @@
-use std::path::{Path, PathBuf};
+use std::path::{PathBuf};
 use reqwest::StatusCode;
 use crate::ImageHandle;
-
-pub fn get_path(path: &Path) -> String {
-    String::from(path.to_str().unwrap_or("cannot display path"))
-}
 
 pub type Result<T> = std::result::Result<T, Error>;
 

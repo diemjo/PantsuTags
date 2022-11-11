@@ -22,7 +22,7 @@ pub mod file_handler;
 pub fn check_image(pantsu_db: &mut PantsuDB, image_path: &Path) -> Result<ImageToImport> {
     let image_info = file_handler::hash::calculate_fileinfo(image_path)?;
     if pantsu_db.get_image_transaction(image_info.filename.as_str()).execute()?.is_some() {
-        return Err(Error::ImageAlreadyExists(error::get_path(image_path)));
+        return Err(Error::ImageAlreadyExists(common::get_path(image_path)));
     }
     let image_handle = ImageHandle::new(image_info.filename, Sauce::NotChecked, image_info.file_res); 
     Ok(ImageToImport {

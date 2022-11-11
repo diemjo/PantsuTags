@@ -20,8 +20,8 @@ pub fn list_tags(images: Vec<PathBuf>, tag_types: Vec<PantsuTagType>, do_print_t
 fn list_tags_for_images(images: Vec<PathBuf>, tag_types: Vec<PantsuTagType>, do_print_tagnames: bool) -> AppResult<()> {
     let db = PantsuDB::new(CONFIGURATION.database_path.as_path())?;
     let len = images.len();
-    for (i, name) in images.into_iter().enumerate() {
-        let image = valid_filename_from_path(name.as_path())?;
+    for (i, path) in images.into_iter().enumerate() {
+        let image = valid_filename_from_path(&path)?;
         let image = db.get_image_transaction(&image)
             .execute()?
             .ok_or_else(|| Error::ImageNotFoundInDB(image))?;

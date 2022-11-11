@@ -1,8 +1,10 @@
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 use rusqlite::{Connection};
-use crate::common::error;
-use crate::common::error::Error;
-use crate::{file_handler};
+
+use crate::common::error::Result;
+use crate::{common, Error, file_handler, PantsuTag, Sauce};
+use crate::common::image_handle::{NOT_CHECKED_FLAG, NOT_EXISTING_FLAG};
 use crate::db::transactions::{DeleteImagesTransaction, InsertImagesTransaction, SelectImagesTransaction, SelectImageTransaction, SelectTagsTransaction, UpdateImagesTransaction};
 
 mod db_calls;
@@ -30,26 +32,26 @@ pub struct PantsuDB {
 
 impl PantsuDB {
 
-    pub fn default() -> Result<PantsuDB, Error> {
+    pub fn default() -> Result<PantsuDB> {
         let mut data_dir = file_handler::default_db_dir();
         data_dir.push("pantsu_tags.db");
         PantsuDB::new(&data_dir)
     }
 
-    pub fn new(db_path: &Path) -> Result<PantsuDB, Error> {
+    pub fn new(db_path: &Path) -> Result<PantsuDB> {
         let mut path_buf = PathBuf::from(db_path);
         if path_buf.exists() && path_buf.is_dir() {
             path_buf.push("pantsu_tags.db");
         }
         std::fs::create_dir_all(path_buf.parent().unwrap()).or_else(|e|
-            Err(Error::DirectoryCreateError(e, error::get_path(path_buf.as_path())))
+            Err(Error::DirectoryCreateError(e, common::get_path(path_buf.as_path())))
         )?;
         let conn = db_init::open(path_buf.as_path())?;
         Ok(PantsuDB { conn })
     }
 
     // WARNING: ALL DATA WILL BE LOST
-    pub fn clear(&mut self) -> Result<(), Error> {
+    pub fn clear(&mut self) -> Result<()> {
         let transaction = self.conn.transaction()?;
 
         db_calls::clear_all_file_tags(&transaction)?;
@@ -90,7 +92,7 @@ impl PantsuDB {
 mod tests {
     use std::collections::HashSet;
     use std::iter::FromIterator;
-    use std::path::Path;
+    use std::path::{Path, PathBuf};
     use crate::common::error::Error;
     use crate::common::image_handle::ImageHandle;
     use crate::db::PantsuDB;
@@ -374,6 +376,39 @@ mod tests {
                 "general:Hoho".parse().unwrap()
             ])
         );
+    }
+
+    #[test]
+    #[serial]
+    fn db_import_file() {
+        let mut pdb = get_pantsu_db(Some(std::env::current_dir().unwrap().as_path())).unwrap();
+        pdb.clear().unwrap();
+
+        let tags_to_add = vec![
+            "general:Haha".parse().unwrap(),
+            "artist:Hehe".parse().unwrap(),
+            "character:Hihi".parse().unwrap(),
+            "general:Hoho".parse().unwrap()
+        ];
+        add_test_image(&mut pdb).unwrap();
+        pdb.update_images_transaction()
+            .for_image(&get_test_image().get_filename())
+            .add_tags(&tags_to_add)
+            .update_sauce(&Sauce::NotExisting)
+            .execute()
+            .unwrap();
+
+        add_test_image2(&mut pdb).unwrap();
+        let sauce = Match("www.url.domain".to_string());
+        pdb.update_images_transaction()
+            .for_image(&get_test_image2().get_filename())
+            .update_sauce(&sauce)
+            .execute()
+            .unwrap();
+
+        let file = PathBuf::from("./test_db_export.txt");
+
+        pdb.import_db(file.as_path()).unwrap();
     }
 
     fn get_pantsu_db(path: Option<&Path>) -> Result<PantsuDB, Error> {

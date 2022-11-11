@@ -1,6 +1,5 @@
-use std::env;
 use std::path::PathBuf;
-use directories::ProjectDirs;
+use directories::{ProjectDirs};
 use regex::Regex;
 
 pub mod hash;
@@ -20,10 +19,6 @@ pub fn default_db_dir() -> PathBuf {
         },
         None => panic!("No valid home dir found")
     }
-}
-
-pub fn default_lib_dir() -> PathBuf {
-    PathBuf::from(env::var("HOME").unwrap()).join("Pictures").join("pantsulib")
 }
 
 pub fn filename_is_valid(name: &str) -> bool {

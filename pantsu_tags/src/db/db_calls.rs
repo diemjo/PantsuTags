@@ -1,10 +1,9 @@
 use rusqlite::{Connection, ffi, params, Transaction};
 use crate::common::error::Result;
-use crate::common::error::Error::{SQLError, SQLPrimaryKeyError};
 use crate::common::image_handle::ImageHandle;
 use crate::common::pantsu_tag::{PantsuTag, PantsuTagType};
 use crate::db::{SauceType, sqlite_statements};
-use crate::Sauce;
+use crate::{Error, Sauce};
 
 // INSERT
 pub(crate) fn add_tags_to_tag_list(transaction: &Transaction, tags: &Vec<&PantsuTag>) -> Result<()> {
@@ -20,9 +19,9 @@ pub(crate) fn add_file_to_file_list(transaction: &Transaction, file: &ImageHandl
     let res = add_file_list_stmt.execute(params![file.get_filename(), file.get_sauce().get_type(), file.get_sauce().get_value(), file.get_res().0, file.get_res().1]);
     // check for primary key constraint
     return if let Err(rusqlite::Error::SqliteFailure(ffi::Error { code: _, extended_code: 1555 }, ..)) = res {
-        Err(SQLPrimaryKeyError(res.unwrap_err()))
+        Err(Error::SQLPrimaryKeyError(res.unwrap_err()))
     } else if let Err(e) = res {
-        Err(SQLError(e))
+        Err(Error::SQLError(e))
     } else {
         Ok(())
     }

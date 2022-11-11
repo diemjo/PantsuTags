@@ -4,7 +4,7 @@ use reqwest::blocking::{Client, multipart};
 use select::document::Document;
 use select::node::Node;
 use select::predicate::{Attr, Name};
-use crate::common::error;
+use crate::common;
 use crate::common::error::Error;
 use crate::common::error::Result;
 use super::SauceMatch;
@@ -16,7 +16,7 @@ pub fn find_sauce(image_path: &Path) -> Result<Vec<SauceMatch>> {
     let client = Client::new();
     let form = multipart::Form::new()
         .file("file", image_path).or_else(
-        |err| Err(Error::FileNotFound(err, error::get_path(image_path))))?;
+        |err| Err(Error::FileNotFound(err, common::get_path(image_path))))?;
     let response = client.post(IQDB_ADDRESS)
         .multipart(form)
         .send()?;

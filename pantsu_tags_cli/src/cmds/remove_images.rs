@@ -6,7 +6,7 @@ use crate::CONFIGURATION;
 pub fn remove_images(images: Vec<PathBuf>) -> AppResult<()> {
     let mut pdb = PantsuDB::new(CONFIGURATION.database_path.as_path())?;
     let images: Vec<String> = images.into_iter()
-        .map(|i| valid_filename_from_path(i.as_path()))
+        .map(|i| valid_filename_from_path(&i))
         .collect::<AppResult<Vec<String>>>()?;
     pdb.remove_image_transaction()
         .remove_images(&images)

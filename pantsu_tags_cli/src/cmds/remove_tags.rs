@@ -7,7 +7,7 @@ use crate::CONFIGURATION;
 pub fn remove_tags(tags: Vec<String>, images: Vec<PathBuf>) -> AppResult<()> {
     let mut db = PantsuDB::new(CONFIGURATION.database_path.as_path())?;
     for image in images {
-        let image = valid_filename_from_path(image.as_path())?;
+        let image = valid_filename_from_path(&image)?;
         let image = db.get_image_transaction(&image)
             .execute()?
             .ok_or_else(|| Error::ImageNotFoundInDB(image))?;

@@ -6,7 +6,7 @@ use pantsu_tags::db::PantsuDB;
 use pantsu_tags::Error;
 use pantsu_tags::image_similarity::{ImageToImport, SimilarImagesGroup};
 use crate::common::{AppError, AppResult};
-use crate::{CONFIGURATION, feh};
+use crate::{common, CONFIGURATION, feh};
 use crate::feh::FehProcesses;
 
 pub fn import_images(no_feh: bool, images: Vec<PathBuf>, always_copy_images: bool) -> AppResult<()> {
@@ -15,7 +15,7 @@ pub fn import_images(no_feh: bool, images: Vec<PathBuf>, always_copy_images: boo
     let mut pdb = PantsuDB::new(CONFIGURATION.database_path.as_path())?;
 
     for image in &images {
-        let image_name = image.to_str().unwrap_or("(can't display image name)");
+        let image_name = common::get_path(image);
         match pantsu_tags::check_image(&mut pdb, image) {
             Ok(img) => valid_images.push(img),
             Err(Error::ImageAlreadyExists(_)) => {
@@ -40,12 +40,12 @@ pub fn import_images(no_feh: bool, images: Vec<PathBuf>, always_copy_images: boo
             let image = group.new_images.into_iter().next().unwrap();
             pantsu_tags::import_image(&mut pdb, CONFIGURATION.library_path.as_path(), image, always_copy_images).unwrap(); // todo: handle error
             import_stats.success += 1;
-            let image_name = image.current_path.to_str().unwrap_or("(can't display image name)");
+            let image_name = common::get_path(&image.current_path);
             println!("{} - {}", "Successfully imported image".green(), image_name);
         }
         else {
             for image in &group.new_images {
-                let image_name = image.current_path.to_str().unwrap_or("(can't display image name)");
+                let image_name = common::get_path(&image.current_path);
                 println!("{} - {}", "Similar images exist       ".yellow(), image_name);
             }
             image_groups_with_similars.push(group);
@@ -69,23 +69,23 @@ fn resolve_similar_image_groups(pdb: &mut PantsuDB, similar_images_groups: Vec<S
     println!("\n\nResolving {} groups of images which are similar to each other.", num_groups);
     for (group_idx, group) in similar_images_groups.iter().enumerate() {
         println!("\nGroup {} of {}:", group_idx+1, num_groups);
-        println!("New images:");
+        println!("  New images:");
         let new_images = &group.new_images;
         for (idx, new_img) in new_images.iter().enumerate() {
-            let image_name = new_img.current_path.to_str().unwrap_or("(can't display image name)");
-            println!("{} - {}", idx+1, image_name)
+            let image_name = common::get_path(&new_img.current_path);
+            println!("    {} - {}", idx+1, image_name)
         }
         if !group.old_images.is_empty() {
-            println!("\nImages already in PantsuTags:");
+            println!("  Images already in PantsuTags:");
             for old_img in &group.old_images {
                 let image_name = old_img.get_filename();
-                println!(" - {}", image_name)
+                println!("      - {}", image_name)
             }
         }
 
         let procs = feh_display_similar(group, use_feh);
         loop {
-            println!("Enter the numbers of the new images that should be added to PantsuTags.");
+            println!("Select the new images that should be added to PantsuTags: (eg: \"1\", \"1 3 12\". \"0\" or empty to select none)");
             input.clear();
             stdin.read_line(&mut input).or_else(|e| Err(AppError::StdinReadError(e)))?;
             let input = input.trim();
@@ -97,7 +97,7 @@ fn resolve_similar_image_groups(pdb: &mut PantsuDB, similar_images_groups: Vec<S
                 let num_new_images = new_images.len();
                 if numbers.iter().all(|&num| num <= num_new_images) {
                     for (idx, new_image) in new_images.iter().enumerate() {
-                        let image_name = new_image.current_path.to_str().unwrap_or("(can't display image name)");
+                        let image_name = common::get_path(&new_image.current_path);
                         if numbers.iter().any(|&num| idx == num-1) {
                             match pantsu_tags::import_image(pdb, CONFIGURATION.library_path.as_path(), new_image, always_copy_images) {
                                 Ok(_) => {
@@ -136,7 +136,8 @@ fn feh_display_similar(similar_images: &SimilarImagesGroup, use_feh: bool) -> Fe
         return feh_proc;
     }
 
-    feh_proc = feh::feh_display_images(similar_images.new_images.iter().map(|img| img.current_path.to_str().unwrap_or("(can't display image name)")),
+    let new_image_names: Vec<String> = similar_images.new_images.iter().map(|img| common::get_path(&img.current_path)).collect();
+    feh_proc = feh::feh_display_images(new_image_names.iter().map(|img_name| img_name.as_str()),
                             "New image", feh_proc);
 
     if !similar_images.old_images.is_empty() {
@@ -144,7 +145,6 @@ fn feh_display_similar(similar_images: &SimilarImagesGroup, use_feh: bool) -> Fe
         // store as vector since we need to pass a &str iterator to feh_display_images()
         let old_images: Vec<String> = similar_images.old_images.iter()
             .map(|img| img.get_path(lib_path)).collect();
-        print!("{:#?}", old_images);
         feh_proc = feh::feh_display_images(old_images.iter().map(|img| img.as_str()),
                                 "Image already stored in PantsuTags", feh_proc)
     }

@@ -109,7 +109,7 @@ fn resolve_sauce_unsure(pdb: &mut PantsuDB, images_to_resolve: Vec<SauceUnsure>,
         }
         thumbnails.feh_display(&image_path);
         loop {
-            println!("If one of the sources is correct, enter the corresponding number.");
+            println!("If one of the sources is correct, select the corresponding image.");
             println!("Enter 'n' if there is no match, or 's' to skip all remaining images.");
             input.clear();
             stdin.read_line(&mut input).or_else(|e| Err(AppError::StdinReadError(e)))?;

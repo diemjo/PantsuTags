@@ -3,9 +3,8 @@ use std::str::FromStr;
 use blockhash::{Blockhash144, Image};
 use image::{DynamicImage, GenericImageView};
 use lz_fnv::{Fnv1a, FnvHasher};
-use crate::common::error;
-use crate::common::error::Result;
-use crate::common::error::Error;
+use crate::{common, Error};
+use crate::common::error::{Result};
 use crate::file_handler::ImageInfo;
 
 struct AdapterImage<'a> {
@@ -24,12 +23,12 @@ impl<'a> Image for AdapterImage<'a> {
 
 pub(crate) fn calculate_fileinfo(path: &Path) -> Result<ImageInfo> {
     let file_content = std::fs::read(&path).or_else(|_|
-        Err(Error::ImageLoadError(error::get_path(&path)))
+        Err(Error::ImageLoadError(common::get_path(&path)))
     )?;
     let file_extension = get_file_extension(&path)?;
 
     let image = image::load_from_memory(&file_content).or_else(|_|
-        Err(Error::ImageLoadError(error::get_path(&path)))
+        Err(Error::ImageLoadError(common::get_path(&path)))
     )?;
     let fnv1a_hash = get_fnv1a_hash(&file_content);
     let perceptual_hash = get_perceptual_hash(&image);
@@ -63,10 +62,10 @@ fn get_perceptual_hash(image: &DynamicImage) -> String {
 
 fn get_file_extension(path: &Path) -> Result<String> {
     let file_extension = path.extension().ok_or_else(||
-        Error::ImageLoadError(error::get_path(&path))
+        Error::ImageLoadError(common::get_path(&path))
     )?;
     let file_extension = file_extension.to_str().ok_or_else(||
-        Error::ImageLoadError(error::get_path(&path))
+        Error::ImageLoadError(common::get_path(&path))
     )?;
     Ok(String::from(file_extension))
 }
