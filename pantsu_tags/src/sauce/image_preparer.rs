@@ -40,6 +40,7 @@ impl ImagePrepared {
 impl Drop for ImagePrepared {
     fn drop(&mut self) {
         if self.to_remove {
+            assert!(self.path.starts_with(std::env::temp_dir()));
             if let Err(_) = fs::remove_file(&mut self.path) {
                 println!("warning: failed to remove temporary image '{}'", common::get_path(&self.path));
             }
@@ -71,9 +72,11 @@ pub fn prepare_image(image_path: PathBuf) -> Result<ImagePrepared> {
 }
 
 fn compress_image(image_path: &Path, res_dir: &Path, factor_func: fn(u32, u32, u64) -> Factor) -> Result<ImagePrepared> {
+    print!("  (Compressing image ");   // hide the filename that is printed by compress_to_jpg()
     let comp = Compressor::new(image_path, res_dir, factor_func);
     let res_image = comp.compress_to_jpg()
         .or_else(|_| Err(Error::ImageTooBig(common::get_path(image_path))))?;
+    println!(")");
     let res_image = ImagePrepared::new_tmp(res_image);
     let res_metadata = get_image_metadata(&res_image.path)
         .or_else(|_| Err(Error::ImageLoadError(common::get_path(image_path))))?;
