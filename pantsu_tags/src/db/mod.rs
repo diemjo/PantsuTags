@@ -1,10 +1,8 @@
 use std::path::{Path, PathBuf};
-use std::str::FromStr;
 use rusqlite::{Connection};
 
 use crate::common::error::Result;
-use crate::{common, Error, file_handler, PantsuTag, Sauce};
-use crate::common::image_handle::{NOT_CHECKED_FLAG, NOT_EXISTING_FLAG};
+use crate::{common, Error, file_handler};
 use crate::db::transactions::{DeleteImagesTransaction, InsertImagesTransaction, SelectImagesTransaction, SelectImageTransaction, SelectTagsTransaction, UpdateImagesTransaction};
 
 mod db_calls;

@@ -60,6 +60,9 @@ pub enum Error {
     #[error("File '{0}' is not an image or cannot be loaded as an image")]
     ImageLoadError(String),
 
+    #[error("File size of image is too big: '{0}'")]
+    ImageTooBig(String),
+
     #[error("'{0}' is not a file")]
     InvalidDatabasePath(String),
 

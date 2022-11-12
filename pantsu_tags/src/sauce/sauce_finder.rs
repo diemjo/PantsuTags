@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::PathBuf;
 use reqwest::blocking;
 use reqwest::blocking::{Client, multipart};
 use select::document::Document;
@@ -8,15 +8,17 @@ use crate::common;
 use crate::common::error::Error;
 use crate::common::error::Result;
 use super::SauceMatch;
+use super::image_preparer;
 
 const IQDB_ADDRESS: &str = "https://gelbooru.iqdb.org/";
 
 // image path has to point to an image, otherwise returns an Error::HtmlParseError
-pub fn find_sauce(image_path: &Path) -> Result<Vec<SauceMatch>> {
+pub fn find_sauce(image_path: PathBuf) -> Result<Vec<SauceMatch>> {
+    let image = image_preparer::prepare_image(image_path)?;
     let client = Client::new();
     let form = multipart::Form::new()
-        .file("file", image_path).or_else(
-        |err| Err(Error::FileNotFound(err, common::get_path(image_path))))?;
+        .file("file", &image.path).or_else(
+        |err| Err(Error::FileNotFound(err, common::get_path(&image.path))))?;
     let response = client.post(IQDB_ADDRESS)
         .multipart(form)
         .send()?;

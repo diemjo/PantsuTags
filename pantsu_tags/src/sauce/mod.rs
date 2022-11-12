@@ -2,6 +2,7 @@ use std::cmp::Ordering;
 
 mod tag_finder;
 mod sauce_finder;
+mod image_preparer;
 
 pub use sauce_finder::find_sauce;
 pub use sauce_finder::get_thumbnail_link;
