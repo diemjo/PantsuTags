@@ -3,7 +3,7 @@ use std::num::ParseIntError;
 use std::path::PathBuf;
 use colored::Colorize;
 use pantsu_tags::db::PantsuDB;
-use pantsu_tags::Error;
+use pantsu_tags::{Error, image_similarity};
 use pantsu_tags::image_similarity::{ImageToImport, SimilarImagesGroup};
 use crate::common::{AppError, AppResult};
 use crate::{common, CONFIGURATION, feh};
@@ -31,14 +31,13 @@ pub fn import_images(no_feh: bool, images: Vec<PathBuf>, always_copy_images: boo
     }
 
     let images_in_db = pdb.get_images_transaction().execute()?;
-    let image_groups = pantsu_tags::image_similarity::group_similar_images(&valid_images, &images_in_db)
-        .map_err(|e| AppError::LibError(e))?;
+    let image_groups = image_similarity::group_similar_images(&valid_images, &images_in_db)?;
 
     let mut image_groups_with_similars: Vec<SimilarImagesGroup> = Vec::new();
     for group in image_groups {
         if group.is_single_image() {
             let image = group.new_images.into_iter().next().unwrap();
-            pantsu_tags::import_image(&mut pdb, CONFIGURATION.library_path.as_path(), image, always_copy_images).unwrap(); // todo: handle error
+            pantsu_tags::import_image(&mut pdb, CONFIGURATION.library_path.as_path(), image, always_copy_images)?;
             import_stats.success += 1;
             let image_name = common::get_path(&image.current_path);
             println!("{} - {}", "Successfully imported image".green(), image_name);
