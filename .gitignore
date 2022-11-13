@@ -23,3 +23,6 @@ completions/
 
 # config file
 pantsu_tags.yaml
+
+# log files
+*.log
