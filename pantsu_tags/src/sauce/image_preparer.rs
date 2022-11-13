@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 use image::GenericImageView;
 use image_compressor::Factor;
 use image_compressor::compressor::Compressor;
+use log::warn;
 use crate::{Error, Result, common};
 
 const TMP_DIR_NAME: &str = "pantsu-tags-compressed-images";
@@ -42,7 +43,7 @@ impl Drop for ImagePrepared {
         if self.to_remove {
             assert!(self.path.starts_with(std::env::temp_dir()));
             if let Err(_) = fs::remove_file(&mut self.path) {
-                println!("warning: failed to remove temporary image '{}'", common::get_path(&self.path));
+                warn!("warning: failed to remove temporary image '{}'", common::get_path(&self.path));
             }
         }
     }

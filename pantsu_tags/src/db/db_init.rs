@@ -1,7 +1,7 @@
 use std::path::Path;
 use rusqlite::{Connection, OpenFlags};
 use crate::common::error::{Error};
-use crate::common;
+use log::{debug};
 use crate::db::sqlite_statements;
 
 pub fn open(db_path: &Path) -> Result<Connection, Error> {
@@ -13,7 +13,6 @@ pub fn open(db_path: &Path) -> Result<Connection, Error> {
     let mut conn = match Connection::open_with_flags(db_path, OpenFlags::SQLITE_OPEN_READ_WRITE) {
         Ok(conn) => conn,
         Err(_) => {
-            eprintln!("Database {} does not exist, creating new...", common::get_path(db_path));
             let conn = Connection::open_with_flags(db_path, OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_CREATE)?;
             conn.pragma_update(None, "foreign_key", "ON")?;
             conn.pragma_update(None, "user_version", 0)?;
@@ -34,13 +33,13 @@ pub fn open(db_path: &Path) -> Result<Connection, Error> {
             }
         }
     } else {
-        //println!("opened database with version {}", pantsu_db_version);
+        debug!("opened database with version {}", current_db_version);
     }
     Ok(conn)
 }
 
 fn db_init_new(connection: &mut Connection) -> Result<(), Error> {
-    println!("Initializing database");
+    debug!("Initializing database");
     connection.execute_batch(sqlite_statements::DB_INIT_TABLES)?;
     Ok(())
 }

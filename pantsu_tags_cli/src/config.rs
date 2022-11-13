@@ -8,7 +8,8 @@ use crate::AppError;
 #[derive(Debug, PartialEq, Deserialize, Serialize)]
 pub struct AppConfig {
     pub library_path: PathBuf,
-    pub database_path: PathBuf
+    pub database_path: PathBuf,
+    pub config_path: PathBuf
 }
 
 impl AppConfig {
@@ -29,6 +30,7 @@ impl Default for AppConfig {
         AppConfig {
             library_path: PathBuf::from("./test_image_lib"), //file_handler::default_lib_dir(),
             database_path: PathBuf::from("./pantsu_tags.db"), //file_handler::default_db_dir()
+            config_path: PathBuf::from("./pantsu_tags.log")
         }
     }
 }

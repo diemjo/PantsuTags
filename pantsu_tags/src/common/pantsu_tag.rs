@@ -10,6 +10,12 @@ pub struct PantsuTag {
     pub tag_type: PantsuTagType
 }
 
+impl PantsuTag {
+    pub fn vec_to_string(vec: &Vec<PantsuTag>) -> String {
+        String::from("[") + &vec.iter().map(|t|t.to_string()).collect::<Vec<String>>().join(", ") + "]"
+    }
+}
+
 impl fmt::Display for PantsuTag {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}:{}", self.tag_type, self.tag_name)

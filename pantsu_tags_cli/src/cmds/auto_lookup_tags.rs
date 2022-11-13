@@ -2,7 +2,8 @@ use std::collections::HashSet;
 use std::{io, iter};
 use std::path::{PathBuf};
 use colored::Colorize;
-use pantsu_tags::{ImageHandle, Sauce, SauceMatch};
+use log::{info, warn};
+use pantsu_tags::{ImageHandle, PantsuTag, Sauce, SauceMatch};
 use pantsu_tags::db::PantsuDB;
 use crate::{AppError, CONFIGURATION, feh};
 use crate::common::{AppResult, valid_filename_from_path};
@@ -52,7 +53,10 @@ pub fn auto_lookup_tags(image_paths: Vec<PathBuf>, sauce_existing: bool, sauce_n
                 });
                 println!("{} - {}", "Source could be wrong    ".yellow(), image.get_filename());
             },
-            Err(e) => eprintln!("Unexpected error: {}", e),
+            Err(e) => {
+                eprintln!("Unexpected error: {}", e);
+                return Err(e);
+            },
         }
     }
 
@@ -74,6 +78,8 @@ fn auto_add_tags_one_image(pdb: &mut PantsuDB, image: &ImageHandle) -> AppResult
                     .update_sauce(&Sauce::Match(sauce.link.clone()))
                     .add_tags(&tags)
                     .execute()?;
+                info!("Set sauce '{}' to image: '{}'", sauce.link.clone(), image.get_filename());
+                info!("Added tags {} to image: '{}'", PantsuTag::vec_to_string(&tags), image.get_filename());
             }
             else { // tags can be added in the sauce resolution
                 return Err(AppError::SauceUnsure(image.clone(), relevant_sauces));
@@ -84,6 +90,7 @@ fn auto_add_tags_one_image(pdb: &mut PantsuDB, image: &ImageHandle) -> AppResult
                 .for_image(image.get_filename())
                 .update_sauce(&Sauce::NotExisting)
                 .execute()?;
+            warn!("Set sauce '{}' to image: '{}'", "NOT_EXISTING", image.get_filename());
             return Err(AppError::NoRelevantSauces);
         }
     }
@@ -128,6 +135,7 @@ fn resolve_sauce_unsure(pdb: &mut PantsuDB, images_to_resolve: Vec<SauceUnsure>,
                     .execute()?;
                 stats.success += 1;
                 println!("{}", "Successfully added tags to image".green());
+                info!("Added tags {} to image: '{}'", PantsuTag::vec_to_string(&tags), image.image_handle.get_filename());
                 break;
             }
             if input.eq("n") {
@@ -137,6 +145,7 @@ fn resolve_sauce_unsure(pdb: &mut PantsuDB, images_to_resolve: Vec<SauceUnsure>,
                     .execute()?;
                 stats.no_source += 1;
                 println!("No tags added");
+                warn!("Set sauce '{}' to image: '{}'", "NOT_EXISTING", image.image_handle.get_filename());
                 break;
             }
             else if input.eq("s") {

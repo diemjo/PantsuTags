@@ -2,6 +2,7 @@ use std::io;
 use std::num::ParseIntError;
 use std::path::PathBuf;
 use colored::Colorize;
+use log::{error, info, warn};
 use pantsu_tags::db::PantsuDB;
 use pantsu_tags::{Error, image_similarity};
 use pantsu_tags::image_similarity::{ImageToImport, SimilarImagesGroup};
@@ -21,10 +22,12 @@ pub fn import_images(no_feh: bool, images: Vec<PathBuf>, always_copy_images: boo
             Err(Error::ImageAlreadyExists(_)) => {
                 import_stats.already_exists += 1;
                 println!("{} - {}", "Image already exists       ", image_name);
+                warn!("Image already exists: '{}'", image_name);
             }
             Err(Error::ImageLoadError(_)) => {
                 import_stats.could_not_open += 1;
                 println!("{} - {}", "Failed to open image       ", image_name);
+                error!("Failed to open image: '{}'", image_name);
             }
             Err(error) => return Err(AppError::LibError(error)),
         }
@@ -41,11 +44,13 @@ pub fn import_images(no_feh: bool, images: Vec<PathBuf>, always_copy_images: boo
             import_stats.success += 1;
             let image_name = common::get_path(&image.current_path);
             println!("{} - {}", "Successfully imported image".green(), image_name);
+            info!("Imported image: '{}'", image_name);
         }
         else {
             for image in &group.new_images {
                 let image_name = common::get_path(&image.current_path);
                 println!("{} - {}", "Similar images exist       ".yellow(), image_name);
+                warn!("Similar images exist to: '{}'", image_name);
             }
             image_groups_with_similars.push(group);
         }
@@ -98,19 +103,15 @@ fn resolve_similar_image_groups(pdb: &mut PantsuDB, similar_images_groups: Vec<S
                     for (idx, new_image) in new_images.iter().enumerate() {
                         let image_name = common::get_path(&new_image.current_path);
                         if numbers.iter().any(|&num| idx == num-1) {
-                            match pantsu_tags::import_image(pdb, CONFIGURATION.library_path.as_path(), new_image, always_copy_images) {
-                                Ok(_) => {
-                                    stats.similar_imported += 1;
-                                    println!("Imported new image {}: {}", idx, image_name)
-                                }
-                                Err(e) => {
-                                    eprintln!("Failed to import new image {}, Error: {}", image_name, e);
-                                }
-                            }
+                            pantsu_tags::import_image(pdb, CONFIGURATION.library_path.as_path(), new_image, always_copy_images)?;
+                            stats.similar_imported += 1;
+                            println!("Imported new image {}: {}", idx, image_name);
+                            info!("Imported similar image: '{}'", image_name);
                         }
                         else {
                             stats.similar_not_imported += 1;
                             println!("New image {} {} imported", image_name, "was not".bold());
+                            warn!("Skipping similar images: '{}'", image_name);
                         }
                     }
 
