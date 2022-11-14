@@ -68,25 +68,22 @@ async fn get_thumbnail_links_async(sauces: &Vec<SauceMatch>) -> Result<Vec<(Stri
         .map(|sauce| {
             let client = &client;
             async move {
-                let resp = match client.get(&sauce.link).send().await {
-                    Ok(resp) => resp,
-                    Err(e) => return (Err(e), sauce),
-                };
-                (resp.text().await, sauce)
+                let resp = client.get(&sauce.link).send().await?;
+                resp.text().await.map(|text| (text,sauce))
             }
         })
         .buffered(MAX_CONCURRENT_REQUESTS);
 
     let links = bodies.then(|res_text| async {
         match res_text {
-            (Ok(text),sauce) => {
+            Ok((text,sauce)) => {
                 let link = extract_thumbnail_link(&text)?;
-                return Ok((link,sauce));
+                Ok((link,sauce))
             },
-            _ => {
-                return Err(Error::FailedThumbnail);
+            Err(_) => {
+                Err(Error::FailedThumbnail)
             }
-        };
+        }
     }).collect::<Vec<Result<(String,&SauceMatch)>>>().await;
 
     links.into_iter().collect::<Result<Vec<(String,&SauceMatch)>>>()
