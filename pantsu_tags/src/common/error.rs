@@ -10,6 +10,9 @@ pub enum Error {
     #[error("Failed to send image source request: {0}")]
     FailedRequest(#[from] reqwest::Error),
 
+    #[error("Failed to get thumbnail")]
+    FailedThumbnail,
+
     #[error("Received response with bad http status: {0}")]
     BadResponseStatus(StatusCode),
 

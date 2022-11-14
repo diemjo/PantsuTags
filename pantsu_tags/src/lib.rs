@@ -10,7 +10,7 @@ pub use crate::common::image_handle::Sauce;
 pub use crate::common::pantsu_tag::{PantsuTag, PantsuTagType};
 use crate::image_similarity::ImageToImport;
 pub use crate::sauce::SauceMatch;
-pub use crate::sauce::get_thumbnail_link;
+pub use crate::sauce::get_thumbnail_links;
 
 mod sauce;
 mod common;

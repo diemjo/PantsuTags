@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+use futures::{stream, StreamExt};
 use reqwest::blocking;
 use reqwest::blocking::{Client, multipart};
 use select::document::Document;
@@ -11,6 +12,7 @@ use super::SauceMatch;
 use super::image_preparer;
 
 const IQDB_ADDRESS: &str = "https://gelbooru.iqdb.org/";
+const MAX_CONCURRENT_REQUESTS: usize = 16;
 
 // image path has to point to an image, otherwise returns an Error::HtmlParseError
 pub fn find_sauce(image_path: PathBuf) -> Result<Vec<SauceMatch>> {
@@ -31,7 +33,8 @@ pub fn find_sauce(image_path: PathBuf) -> Result<Vec<SauceMatch>> {
     extract_sauce(&html)
 }
 
-pub fn get_thumbnail_link(sauce: &SauceMatch) -> Result<String> {
+// todo: remove?
+fn get_thumbnail_link(sauce: &SauceMatch) -> Result<String> {
     let response = blocking::get(&sauce.link)?;
     if !response.status().is_success() {
         return Err(Error::BadResponseStatus(response.status()));
@@ -40,6 +43,60 @@ pub fn get_thumbnail_link(sauce: &SauceMatch) -> Result<String> {
     let image = html.find(Attr("id", "image")).next().ok_or(Error::HtmlParseError)?; // thumbnail html element should always exist
     let link = image.attr("src").ok_or(Error::HtmlParseError)?;
     Ok(link.to_owned())
+}
+
+pub fn get_thumbnail_links(sauces: &Vec<SauceMatch>) -> Result<Vec<String>> {
+    let rt = tokio::runtime::Runtime::new()
+        .or(Err(Error::FailedThumbnail))?;
+    let links = rt.block_on(async {
+        return get_thumbnail_links_async(sauces).await;
+    })?;
+
+    // make sure that the vec of links has the same order as the vec of Sauces
+    Ok(links.into_iter().enumerate()
+        .map(|(idx,link)| {
+            assert!(*link.1 == sauces[idx]);
+            link.0
+        }
+    ).collect())
+}
+
+// explanation: https://stackoverflow.com/a/51047786
+async fn get_thumbnail_links_async(sauces: &Vec<SauceMatch>) -> Result<Vec<(String,&SauceMatch)>> {
+    let client = reqwest::Client::new();
+    let bodies = stream::iter(sauces)
+        .map(|sauce| {
+            let client = &client;
+            async move {
+                let resp = match client.get(&sauce.link).send().await {
+                    Ok(resp) => resp,
+                    Err(e) => return (Err(e), sauce),
+                };
+                (resp.text().await, sauce)
+            }
+        })
+        .buffered(MAX_CONCURRENT_REQUESTS);
+
+    let links = bodies.then(|res_text| async {
+        match res_text {
+            (Ok(text),sauce) => {
+                let link = extract_thumbnail_link(&text)?;
+                return Ok((link,sauce));
+            },
+            _ => {
+                return Err(Error::FailedThumbnail);
+            }
+        };
+    }).collect::<Vec<Result<(String,&SauceMatch)>>>().await;
+
+    links.into_iter().collect::<Result<Vec<(String,&SauceMatch)>>>()
+}
+
+// Extract thumbnail from Gelbooru page
+fn extract_thumbnail_link(html_text: &str) -> Result<String> {
+    let html = Document::from(html_text);
+    let image = html.find(Attr("id", "image")).next().ok_or(Error::HtmlParseError)?; // thumbnail html element should always exist
+    image.attr("src").ok_or(Error::HtmlParseError).map(|link| link.to_owned())
 }
 
 

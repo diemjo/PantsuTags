@@ -110,11 +110,11 @@ fn resolve_sauce_unsure(pdb: &mut PantsuDB, images_to_resolve: Vec<SauceUnsure>,
         let image_path = image.image_handle.get_path(lib_path);
         let mut thumbnails = ThumbnailDisplayer::new(use_feh);
         println!("\nImage {} of {}:\n{}\n", image_idx+1, images_to_resolve.len(), image_path);
+        thumbnails.set_thumbnail_links(&image.matches);
+        thumbnails.feh_display(&image_path);
         for (index, sauce) in image.matches.iter().enumerate() {
-            thumbnails.add_thumbnail_link(sauce);
             println!("{} - {}", index+1, sauce.link);
         }
-        thumbnails.feh_display(&image_path);
         loop {
             println!("If one of the sources is correct, select the corresponding image.");
             println!("Enter 'n' if there is no match, or 's' to skip all remaining images.");
@@ -195,18 +195,17 @@ impl ThumbnailDisplayer {
         }
     }
 
-    fn add_thumbnail_link(&mut self, sauce: &SauceMatch) {
+    fn set_thumbnail_links(&mut self, sauces: &Vec<SauceMatch>) {
         if !self.enabled {
             return;
         }
-        let link = match pantsu_tags::get_thumbnail_link(sauce) {
-            Ok(link) => link,
+        match pantsu_tags::get_thumbnail_links(&sauces) {
+            Ok(links) => self.thumbnail_links = links,
             Err(_) => {
-                self.enabled = false; // if left enabled without adding a thumbnail, the indices will be wrong.
-                return;
-            },
-        };
-        self.thumbnail_links.push(link);
+            // todo: log warning?
+            self.enabled = false;
+            }
+        }
     }
 
     fn feh_display(&mut self, image_path: &str) {

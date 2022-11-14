@@ -5,7 +5,7 @@ mod sauce_finder;
 mod image_preparer;
 
 pub use sauce_finder::find_sauce;
-pub use sauce_finder::get_thumbnail_link;
+pub use sauce_finder::get_thumbnail_links;
 pub use tag_finder::find_tags_gelbooru;
 
 
@@ -65,7 +65,7 @@ mod tests {
         let image_link = "https://img1.gelbooru.com/images/4f/76/4f76b8d52983af1d28b1bf8d830d684e.png";
         let path = prepare_image(image_link);
 
-        let sauces = sauce_finder::find_sauce(&path).unwrap();
+        let sauces = sauce_finder::find_sauce(path).unwrap();
         assert_eq!(sauces[0].link, sauce_link);
         assert_eq!(sauces[0].similarity, 96);
         assert_eq!(sauces[0].resolution, (533, 745));

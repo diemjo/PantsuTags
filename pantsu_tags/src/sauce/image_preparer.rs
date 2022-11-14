@@ -37,7 +37,6 @@ impl ImagePrepared {
     }
 }
 
-// todo maybe: check that file is in /tmp
 impl Drop for ImagePrepared {
     fn drop(&mut self) {
         if self.to_remove {
