@@ -64,27 +64,19 @@ pub fn get_thumbnail_links(sauces: &Vec<SauceMatch>) -> Result<Vec<String>> {
 // explanation: https://stackoverflow.com/a/51047786
 async fn get_thumbnail_links_async(sauces: &Vec<SauceMatch>) -> Result<Vec<(String,&SauceMatch)>> {
     let client = reqwest::Client::new();
-    let bodies = stream::iter(sauces)
+    let links = stream::iter(sauces)
         .map(|sauce| {
             let client = &client;
             async move {
                 let resp = client.get(&sauce.link).send().await?;
-                resp.text().await.map(|text| (text,sauce))
-            }
-        })
-        .buffered(MAX_CONCURRENT_REQUESTS);
-
-    let links = bodies.then(|res_text| async {
-        match res_text {
-            Ok((text,sauce)) => {
+                let text = resp.text().await
+                    .map_err(|_| Error::FailedThumbnail)?;
                 let link = extract_thumbnail_link(&text)?;
                 Ok((link,sauce))
-            },
-            Err(_) => {
-                Err(Error::FailedThumbnail)
             }
-        }
-    }).collect::<Vec<Result<(String,&SauceMatch)>>>().await;
+        })
+        .buffered(MAX_CONCURRENT_REQUESTS)
+        .collect::<Vec<Result<(String,&SauceMatch)>>>().await;
 
     links.into_iter().collect::<Result<Vec<(String,&SauceMatch)>>>()
 }
