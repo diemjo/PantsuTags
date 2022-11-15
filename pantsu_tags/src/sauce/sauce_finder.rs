@@ -5,10 +5,10 @@ use reqwest::blocking::{Client, multipart};
 use select::document::Document;
 use select::node::Node;
 use select::predicate::{Attr, Name};
-use tokio::fs::File;
 use tokio::io;
 use crate::common;
-use crate::common::tmp_dir::{self, TmpFile};
+use crate::common::tmp_dir::TmpFile;
+use crate::common::tmp_dir_async;
 use crate::common::error::Error;
 use crate::common::error::Result;
 use super::SauceMatch;
@@ -51,7 +51,7 @@ fn get_thumbnail_link(sauce: &SauceMatch) -> Result<String> {
 
 pub fn get_thumbnails(sauces: &Vec<SauceMatch>) -> Result<Vec<TmpFile>> {
     let rt = tokio::runtime::Runtime::new()
-        .or(Err(Error::FailedThumbnail))?;
+        .or_else(|e| Err(Error::TokioInitError(e)))?;
     let links = rt.block_on(get_thumbnails_async(sauces))?;
 
     // make sure that the vec of links has the same order as the vec of Sauces
@@ -98,11 +98,7 @@ fn extract_thumbnail_link(html_text: &str) -> Result<String> {
 
 async fn store_thumbnail(link: &str, data: &[u8]) -> Result<TmpFile> {
     let file_name = link.rsplit_once('/').map(|(_,name)| name ).unwrap_or(link);
-    let mut path = tmp_dir::get_tmp_dir(THUMBNAIL_TMP_SUBDIR)?;
-    path.push(file_name);
-    let mut file = File::create(&path).await
-        .or_else(|e| Err(Error::FileCreateError(e, common::get_path(&path))))?;
-    let path = TmpFile::new(path);
+    let (path,mut file) = tmp_dir_async::create_tmp_file(THUMBNAIL_TMP_SUBDIR, file_name).await?;
     io::copy(&mut data.as_ref(), &mut file).await
         .or(Err(Error::FailedThumbnail))?;
     Ok(path)

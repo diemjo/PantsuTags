@@ -74,4 +74,7 @@ pub enum Error {
 
     #[error("'{0}' is not formatted correctly as an import file")]
     InvalidImportFileFormat(String),
+
+    #[error("Failed to initialize tokio runtime ({0})")]
+    TokioInitError(#[source] std::io::Error)
 }

@@ -1,4 +1,4 @@
-use std::{path::{Path, PathBuf}, fs::{self, File}};
+use std::{path::{Path, PathBuf}};
 use log::warn;
 
 use crate::common;
@@ -22,26 +22,36 @@ impl TmpFile {
 impl Drop for TmpFile {
     fn drop(&mut self) {
         assert!(self.path.starts_with(std::env::temp_dir()));
-        if let Err(_) = fs::remove_file(&mut self.path) {
+        if let Err(_) = std::fs::remove_file(&mut self.path) {
             warn!("warning: failed to remove temporary file '{}'", common::get_path(&self.path));
         }
     }
 }
 
-pub fn create_tmp_file(sub_dir_name: &str, filename: &str) -> Result<(TmpFile,File)> {
-    let mut path = get_tmp_dir(sub_dir_name)?;
-    path.push(filename);
-    let file = File::create(&path)
-        .or_else(|e| Err(Error::FileCreateError(e, common::get_path(&path))))?;
-    let tmp_path = TmpFile::new(path);
-    Ok((tmp_path,file))
+pub fn get_tmp_dir(sub_dir_name: &str) -> Result<PathBuf> {
+    let rt = tokio::runtime::Runtime::new()
+        .or_else(|e| Err(Error::TokioInitError(e)))?;
+    rt.block_on(tmp_dir_async::get_tmp_dir(sub_dir_name))
 }
 
-pub fn get_tmp_dir(sub_dir_name: &str) -> Result<PathBuf> {
-    let mut tmp_dir = std::env::temp_dir();
-    tmp_dir.push(TMP_TOP_DIR_NAME);
-    tmp_dir.push(sub_dir_name);
-    fs::create_dir_all(&tmp_dir)
-        .or_else(|err| Err(Error::DirectoryCreateError(err, common::get_path(&tmp_dir))))?;
-    Ok(tmp_dir)
+pub mod tmp_dir_async {
+    use super::*;
+
+    pub async fn create_tmp_file(sub_dir_name: &str, filename: &str) -> Result<(TmpFile,tokio::fs::File)> {
+        let mut path = get_tmp_dir(sub_dir_name).await?;
+        path.push(filename);
+        let file = tokio::fs::File::create(&path).await
+            .or_else(|e| Err(Error::FileCreateError(e, common::get_path(&path))))?;
+        let tmp_path = TmpFile::new(path);
+        Ok((tmp_path,file))
+    }
+
+    pub async fn get_tmp_dir(sub_dir_name: &str) -> Result<PathBuf> {
+        let mut tmp_dir = std::env::temp_dir();
+        tmp_dir.push(TMP_TOP_DIR_NAME);
+        tmp_dir.push(sub_dir_name);
+        tokio::fs::create_dir_all(&tmp_dir).await
+            .or_else(|err| Err(Error::DirectoryCreateError(err, common::get_path(&tmp_dir))))?;
+        Ok(tmp_dir)
+    }
 }
