@@ -28,9 +28,7 @@ pub fn find_sauce(image_path: PathBuf) -> Result<Vec<SauceMatch>> {
     let response = client.post(IQDB_ADDRESS)
         .multipart(form)
         .send()?;
-    if !response.status().is_success() {
-        return Err(Error::BadResponseStatus(response.status()));
-    }
+    check_status(response.status())?;
 
     let response = response.text()?;
     let html = Document::from(response.as_str());
@@ -40,9 +38,7 @@ pub fn find_sauce(image_path: PathBuf) -> Result<Vec<SauceMatch>> {
 // todo: remove?
 fn get_thumbnail_link(sauce: &SauceMatch) -> Result<String> {
     let response = blocking::get(&sauce.link)?;
-    if !response.status().is_success() {
-        return Err(Error::BadResponseStatus(response.status()));
-    }
+    check_status(response.status())?;
     let html = Document::from(response.text()?.as_str());
     let image = html.find(Attr("id", "image")).next().ok_or(Error::HtmlParseError)?; // thumbnail html element should always exist
     let link = image.attr("src").ok_or(Error::HtmlParseError)?;
@@ -213,8 +209,8 @@ fn extract_sauce_similarity(sauce_match_tr_element: Node) -> Option<i32> {
 }
 
 fn check_status(status: StatusCode) -> Result<()> {
-    if status.is_success() {
-        return Ok(())
+    if !status.is_success() {
+        return Err(Error::BadResponseStatus(status));
     }
-    Err(Error::BadResponseStatus(status))
+    Ok(())
 }
