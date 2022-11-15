@@ -8,9 +8,10 @@ pub use crate::common::error::Result;
 pub use crate::common::image_handle::ImageHandle;
 pub use crate::common::image_handle::Sauce;
 pub use crate::common::pantsu_tag::{PantsuTag, PantsuTagType};
+pub use crate::common::tmp_dir::TmpFile;
 use crate::image_similarity::ImageToImport;
 pub use crate::sauce::SauceMatch;
-pub use crate::sauce::get_thumbnail_links;
+pub use crate::sauce::get_thumbnails;
 
 mod sauce;
 mod common;

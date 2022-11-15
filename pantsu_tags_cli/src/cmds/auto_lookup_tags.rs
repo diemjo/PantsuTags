@@ -3,7 +3,7 @@ use std::{io, iter};
 use std::path::{PathBuf};
 use colored::Colorize;
 use log::{info, warn};
-use pantsu_tags::{ImageHandle, PantsuTag, Sauce, SauceMatch};
+use pantsu_tags::{ImageHandle, PantsuTag, Sauce, SauceMatch, TmpFile};
 use pantsu_tags::db::PantsuDB;
 use crate::{AppError, CONFIGURATION, feh};
 use crate::common::{AppResult, valid_filename_from_path};
@@ -110,7 +110,7 @@ fn resolve_sauce_unsure(pdb: &mut PantsuDB, images_to_resolve: Vec<SauceUnsure>,
         let image_path = image.image_handle.get_path(lib_path);
         let mut thumbnails = ThumbnailDisplayer::new(use_feh);
         println!("\nImage {} of {}:\n{}\n", image_idx+1, images_to_resolve.len(), image_path);
-        thumbnails.set_thumbnail_links(&image.matches);
+        thumbnails.set_thumbnails(&image.matches);
         thumbnails.feh_display(&image_path);
         for (index, sauce) in image.matches.iter().enumerate() {
             println!("{} - {}", index+1, sauce.link);
@@ -182,28 +182,28 @@ struct SauceUnsure {
 }
 
 struct ThumbnailDisplayer {
-    thumbnail_links: Vec<String>,
+    thumbnails: Vec<TmpFile>,
     enabled: bool,
     feh_processes: Option<FehProcesses>,
 }
 impl ThumbnailDisplayer {
     fn new(enable: bool) -> Self {
         ThumbnailDisplayer {
-            thumbnail_links: Vec::new(),
+            thumbnails: Vec::new(),
             enabled: enable,
             feh_processes: None,
         }
     }
 
-    fn set_thumbnail_links(&mut self, sauces: &Vec<SauceMatch>) {
+    fn set_thumbnails(&mut self, sauces: &Vec<SauceMatch>) {
         if !self.enabled {
             return;
         }
-        match pantsu_tags::get_thumbnail_links(&sauces) {
-            Ok(links) => self.thumbnail_links = links,
+        match pantsu_tags::get_thumbnails(&sauces) {
+            Ok(paths) => self.thumbnails = paths,
             Err(_) => {
-            // todo: log warning?
-            self.enabled = false;
+                // todo: log warning?
+                self.enabled = false;
             }
         }
     }
@@ -212,10 +212,16 @@ impl ThumbnailDisplayer {
         if !self.enabled {
             return;
         }
-        let links = self.thumbnail_links.iter().map(|s| s.as_str());
+        let paths = self.thumbnails.iter()
+            .map(|p| p.get_path().to_str())
+            .collect::<Option<Vec<&str>>>();
+        let paths = match paths {
+            Some(p) => p,
+            None => return,
+        };
         let mut procs = self.feh_processes.take().unwrap_or(FehProcesses::new_empty());
         procs = feh::feh_display_images(iter::once(image_path), "Local image", procs);
-        self.feh_processes = Some(feh::feh_display_images(links, "Potential source", procs));
+        self.feh_processes = Some(feh::feh_display_images(paths.into_iter(), "Potential source", procs));
     }
 
     fn kill_feh(&mut self) {

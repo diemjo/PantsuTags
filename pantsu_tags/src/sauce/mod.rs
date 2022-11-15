@@ -5,7 +5,7 @@ mod sauce_finder;
 mod image_preparer;
 
 pub use sauce_finder::find_sauce;
-pub use sauce_finder::get_thumbnail_links;
+pub use sauce_finder::get_thumbnails;
 pub use tag_finder::find_tags_gelbooru;
 
 

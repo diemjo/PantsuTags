@@ -1,11 +1,14 @@
 use std::path::PathBuf;
 use futures::{stream, StreamExt};
-use reqwest::blocking;
+use reqwest::{blocking, StatusCode};
 use reqwest::blocking::{Client, multipart};
 use select::document::Document;
 use select::node::Node;
 use select::predicate::{Attr, Name};
+use tokio::fs::File;
+use tokio::io;
 use crate::common;
+use crate::common::tmp_dir::{self, TmpFile};
 use crate::common::error::Error;
 use crate::common::error::Result;
 use super::SauceMatch;
@@ -13,6 +16,7 @@ use super::image_preparer;
 
 const IQDB_ADDRESS: &str = "https://gelbooru.iqdb.org/";
 const MAX_CONCURRENT_REQUESTS: usize = 16;
+const THUMBNAIL_TMP_SUBDIR: &str = "thumbnails";
 
 // image path has to point to an image, otherwise returns an Error::HtmlParseError
 pub fn find_sauce(image_path: PathBuf) -> Result<Vec<SauceMatch>> {
@@ -45,12 +49,10 @@ fn get_thumbnail_link(sauce: &SauceMatch) -> Result<String> {
     Ok(link.to_owned())
 }
 
-pub fn get_thumbnail_links(sauces: &Vec<SauceMatch>) -> Result<Vec<String>> {
+pub fn get_thumbnails(sauces: &Vec<SauceMatch>) -> Result<Vec<TmpFile>> {
     let rt = tokio::runtime::Runtime::new()
         .or(Err(Error::FailedThumbnail))?;
-    let links = rt.block_on(async {
-        return get_thumbnail_links_async(sauces).await;
-    })?;
+    let links = rt.block_on(get_thumbnails_async(sauces))?;
 
     // make sure that the vec of links has the same order as the vec of Sauces
     Ok(links.into_iter().enumerate()
@@ -62,23 +64,29 @@ pub fn get_thumbnail_links(sauces: &Vec<SauceMatch>) -> Result<Vec<String>> {
 }
 
 // explanation: https://stackoverflow.com/a/51047786
-async fn get_thumbnail_links_async(sauces: &Vec<SauceMatch>) -> Result<Vec<(String,&SauceMatch)>> {
+async fn get_thumbnails_async(sauces: &Vec<SauceMatch>) -> Result<Vec<(TmpFile,&SauceMatch)>> {
     let client = reqwest::Client::new();
     let links = stream::iter(sauces)
         .map(|sauce| {
             let client = &client;
             async move {
                 let resp = client.get(&sauce.link).send().await?;
+                check_status(resp.status())?;
                 let text = resp.text().await
                     .map_err(|_| Error::FailedThumbnail)?;
                 let link = extract_thumbnail_link(&text)?;
-                Ok((link,sauce))
+
+                let resp = client.get(&link).send().await?;
+                check_status(resp.status())?;
+                let data = resp.bytes().await?;
+                let path = store_thumbnail(&link, data.as_ref()).await?;
+                Ok((path,sauce))
             }
         })
         .buffered(MAX_CONCURRENT_REQUESTS)
-        .collect::<Vec<Result<(String,&SauceMatch)>>>().await;
+        .collect::<Vec<Result<(TmpFile,&SauceMatch)>>>().await;
 
-    links.into_iter().collect::<Result<Vec<(String,&SauceMatch)>>>()
+    links.into_iter().collect::<Result<Vec<(TmpFile,&SauceMatch)>>>()
 }
 
 // Extract thumbnail from Gelbooru page
@@ -88,6 +96,17 @@ fn extract_thumbnail_link(html_text: &str) -> Result<String> {
     image.attr("src").ok_or(Error::HtmlParseError).map(|link| link.to_owned())
 }
 
+async fn store_thumbnail(link: &str, data: &[u8]) -> Result<TmpFile> {
+    let file_name = link.rsplit_once('/').map(|(_,name)| name ).unwrap_or(link);
+    let mut path = tmp_dir::get_tmp_dir(THUMBNAIL_TMP_SUBDIR)?;
+    path.push(file_name);
+    let mut file = File::create(&path).await
+        .or_else(|e| Err(Error::FileCreateError(e, common::get_path(&path))))?;
+    let path = TmpFile::new(path);
+    io::copy(&mut data.as_ref(), &mut file).await
+        .or(Err(Error::FailedThumbnail))?;
+    Ok(path)
+}
 
 fn extract_sauce(html: &Document) -> Result<Vec<SauceMatch>> {
     let mut pages = html.find(Attr("id", "pages"));
@@ -195,4 +214,11 @@ fn extract_sauce_similarity(sauce_match_tr_element: Node) -> Option<i32> {
     let text = td.text();
     let similarity = text.split('%').collect::<Vec<&str>>()[0];
     similarity.parse::<i32>().ok()
+}
+
+fn check_status(status: StatusCode) -> Result<()> {
+    if status.is_success() {
+        return Ok(())
+    }
+    Err(Error::BadResponseStatus(status))
 }
