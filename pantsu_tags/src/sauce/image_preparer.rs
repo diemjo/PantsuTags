@@ -1,4 +1,3 @@
-use std::fs;
 use std::fs::File;
 use std::io;
 use std::io::Read;
@@ -6,10 +5,10 @@ use std::path::{Path, PathBuf};
 use image::GenericImageView;
 use image_compressor::Factor;
 use image_compressor::compressor::Compressor;
-use log::warn;
+use crate::common::tmp_dir::{self, TmpFile};
 use crate::{Error, Result, common};
 
-const TMP_DIR_NAME: &str = "pantsu-tags-compressed-images";
+const COMPRESSED_TMP_SUBDIR: &str = "compressed-images";
 const IQDB_MAX_SIZE: u64 = 1<<23;
 const IQDB_MAX_DIMENSIONS: (u32,u32) = (7500,7500);
 
@@ -17,9 +16,13 @@ const IMAGE_SCALE_EPSILON: f32 = 0.1;
 const QUALITY_IMAGE_HIGH: f32 = 80.0;
 const QUALITY_IMAGE_LOW: f32 = 60.0;
 
+enum PathKind {
+    File(PathBuf),
+    TmpFile(TmpFile),
+}
+
 pub struct ImagePrepared {
-    pub path: PathBuf,
-    to_remove: bool,
+    path: PathKind,
 }
 
 struct ImageMetadata {
@@ -29,21 +32,17 @@ struct ImageMetadata {
 
 impl ImagePrepared {
     fn new(image_path: PathBuf) -> ImagePrepared {
-        ImagePrepared { path: image_path, to_remove: false }
+        ImagePrepared { path: PathKind::File(image_path) }
     }
 
     fn new_tmp(image_path: PathBuf) -> ImagePrepared {
-        ImagePrepared { path: image_path, to_remove: true }
+        ImagePrepared { path: PathKind::TmpFile(TmpFile::new(image_path)) }
     }
-}
 
-impl Drop for ImagePrepared {
-    fn drop(&mut self) {
-        if self.to_remove {
-            assert!(self.path.starts_with(std::env::temp_dir()));
-            if let Err(_) = fs::remove_file(&mut self.path) {
-                warn!("warning: failed to remove temporary image '{}'", common::get_path(&self.path));
-            }
+    pub fn get_path(&self) -> &Path {
+        match &self.path {
+            PathKind::File(f) => &f,
+            PathKind::TmpFile(f) => f.get_path(),
         }
     }
 }
@@ -55,7 +54,7 @@ pub fn prepare_image(image_path: PathBuf) -> Result<ImagePrepared> {
         return Ok(ImagePrepared::new(image_path));
     }
 
-    let res_dir = get_tmp_dir()?;
+    let res_dir = tmp_dir::get_tmp_dir(COMPRESSED_TMP_SUBDIR)?;
 
     // try compress to QUALITY_IMAGE_HIGH
     let res = compress_image(&image_path, &res_dir, |w, h, _| {
@@ -78,7 +77,7 @@ fn compress_image(image_path: &Path, res_dir: &Path, factor_func: fn(u32, u32, u
         .or_else(|_| Err(Error::ImageTooBig(common::get_path(image_path))))?;
     println!(")");
     let res_image = ImagePrepared::new_tmp(res_image);
-    let res_metadata = get_image_metadata(&res_image.path)
+    let res_metadata = get_image_metadata(res_image.get_path())
         .or_else(|_| Err(Error::ImageLoadError(common::get_path(image_path))))?;
     if res_metadata.file_size <= IQDB_MAX_SIZE {
         return Ok(res_image)
@@ -99,14 +98,6 @@ fn get_image_metadata(image_path: &Path) -> io::Result<ImageMetadata> {
         dimensions: image.dimensions(),
         file_size: size,
     })
-}
-
-fn get_tmp_dir() -> Result<PathBuf>{
-    let mut tmp_dir = std::env::temp_dir();
-    tmp_dir.push(TMP_DIR_NAME);
-    fs::create_dir_all(&tmp_dir)
-        .or_else(|err| Err(Error::DirectoryCreateError(err, common::get_path(&tmp_dir))))?;
-    Ok(tmp_dir)
 }
 
 fn get_scale(dimensions: (u32,u32)) -> f32 {
