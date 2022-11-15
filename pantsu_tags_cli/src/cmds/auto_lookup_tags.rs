@@ -18,20 +18,7 @@ pub fn auto_lookup_tags(image_paths: Vec<PathBuf>, sauce_existing: bool, sauce_n
     let mut stats = AutoTaggingStats::default();
     let mut unsure_source_images: Vec<SauceUnsure> = Vec::new();
     let mut pdb = PantsuDB::new(CONFIGURATION.database_path.as_path())?;
-    let mut images: HashSet<ImageHandle> = if sauce_existing {
-        pdb.get_images_transaction().with_existing_sauce().execute()?
-    } else if sauce_not_existing {
-        pdb.get_images_transaction().with_not_existing_sauce().execute()?
-    } else if sauce_not_checked {
-        pdb.get_images_transaction().with_not_checked_sauce().execute()?
-    } else {
-        Vec::new()
-    }.into_iter().collect();
-    for image_path in &image_paths {
-        let image_name = valid_filename_from_path(image_path)?;
-        let image = pdb.get_image_transaction(&image_name).execute()?.ok_or_else(|| AppError::ImageNotFound(image_name))?;
-        images.insert(image);
-    }
+    let images = get_images(&pdb, &image_paths, sauce_existing, sauce_not_existing, sauce_not_checked)?;
     for image in &images {
         let res = auto_add_tags_one_image(&mut pdb, image);
         match res {
@@ -158,6 +145,24 @@ fn resolve_sauce_unsure(pdb: &mut PantsuDB, images_to_resolve: Vec<SauceUnsure>,
         thumbnails.kill_feh();
     }
     Ok(())
+}
+
+fn get_images(pdb: &PantsuDB, image_paths: &Vec<PathBuf>, sauce_existing: bool, sauce_not_existing: bool, sauce_not_checked: bool) -> AppResult<HashSet<ImageHandle>> {
+    let mut images: HashSet<ImageHandle> = if sauce_existing {
+        pdb.get_images_transaction().with_existing_sauce().execute()?
+    } else if sauce_not_existing {
+        pdb.get_images_transaction().with_not_existing_sauce().execute()?
+    } else if sauce_not_checked {
+        pdb.get_images_transaction().with_not_checked_sauce().execute()?
+    } else {
+        Vec::new()
+    }.into_iter().collect();
+    for image_path in image_paths {
+        let image_name = valid_filename_from_path(image_path)?;
+        let image = pdb.get_image_transaction(&image_name).execute()?.ok_or_else(|| AppError::ImageNotFound(image_name))?;
+        images.insert(image);
+    }
+    Ok(images)
 }
 
 #[derive(Default)]
