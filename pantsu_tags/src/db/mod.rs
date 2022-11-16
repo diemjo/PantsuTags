@@ -9,6 +9,7 @@ mod db_calls;
 mod sqlite_statements;
 mod db_init;
 mod transactions;
+mod db_import_export;
 
 pub enum AspectRatio {
     Any,
@@ -83,6 +84,10 @@ impl PantsuDB {
 
     pub fn remove_image_transaction<'a>(&'a mut self) -> DeleteImagesTransaction<'a> {
         DeleteImagesTransaction::new(&mut self.conn)
+    }
+
+    pub fn import_db_file(&mut self, import_file_path: &Path) -> Result<()> {
+        db_import_export::import_db_file(self, import_file_path)
     }
 }
 
@@ -392,21 +397,51 @@ mod tests {
         pdb.update_images_transaction()
             .for_image(&get_test_image().get_filename())
             .add_tags(&tags_to_add)
-            .update_sauce(&Sauce::NotExisting)
             .execute()
             .unwrap();
 
         add_test_image2(&mut pdb).unwrap();
-        let sauce = Match("www.url.domain".to_string());
-        pdb.update_images_transaction()
-            .for_image(&get_test_image2().get_filename())
-            .update_sauce(&sauce)
-            .execute()
-            .unwrap();
 
         let file = PathBuf::from("./test_db_export.txt");
 
-        pdb.import_db(file.as_path()).unwrap();
+        pdb.import_db_file(file.as_path()).unwrap();
+
+        let img1 = pdb.get_image_transaction(&get_test_image().get_filename()).execute().unwrap().unwrap();
+        let sauce1 = img1.get_sauce();
+        assert_eq!(sauce1, &Sauce::Match("domain.found.hehe/cool/tags?cool=yes".to_string()));
+
+        let img2 = pdb.get_image_transaction(&get_test_image2().get_filename()).execute().unwrap().unwrap();
+        let sauce2 = img2.get_sauce();
+        assert_eq!(sauce2, get_test_image2().get_sauce());
+
+        let image = pdb.get_image_transaction("00001874f801fd63-03f07d07b03b05f3370670df0db0ff031111.jpg").execute().unwrap();
+        assert_eq!(image, None);
+    }
+
+    #[test]
+    #[serial]
+    fn db_import_file_error() {
+        let mut pdb = get_pantsu_db(Some(std::env::current_dir().unwrap().as_path())).unwrap();
+        pdb.clear().unwrap();
+
+        let file = PathBuf::from("./test_db_export_fail.txt");
+        assert!(match pdb.import_db_file(file.as_path()).unwrap_err() {
+            e @Error::InvalidImportFileFormat(_, _) => { println!("{}", e); true },
+            _ => false
+        });
+    }
+
+    #[test]
+    #[serial]
+    fn db_import_file_error2() {
+        let mut pdb = get_pantsu_db(Some(std::env::current_dir().unwrap().as_path())).unwrap();
+        pdb.clear().unwrap();
+
+        let file = PathBuf::from("./test_db_export_fail2.txt");
+        assert!(match pdb.import_db_file(file.as_path()).unwrap_err() {
+            e @Error::InvalidImportFileFormat(_, _) => { println!("{:?}", e); true },
+            _ => false
+        });
     }
 
     fn get_pantsu_db(path: Option<&Path>) -> Result<PantsuDB, Error> {

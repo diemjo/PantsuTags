@@ -73,7 +73,7 @@ pub enum Error {
     InvalidDatabasePath(String),
 
     #[error("'{0}' is not formatted correctly as an import file")]
-    InvalidImportFileFormat(String),
+    InvalidImportFileFormat(String, Option<Box<Error>>),
 
     #[error("Failed to initialize tokio runtime ({0})")]
     TokioInitError(#[source] std::io::Error)
