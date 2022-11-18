@@ -98,7 +98,9 @@ mod tests {
 
     fn prepare_image(image_link: &str) -> PathBuf {
         let image_name = image_link.rsplit('/').next().unwrap();
-        let image_path = PathBuf::from(format!("test_image_{}", image_name));
+        let path = PathBuf::from("./test");
+        std::fs::create_dir(&path).unwrap();
+        let image_path = path.join(PathBuf::from(format!("test_image_{}", image_name)));
         if image_path.exists() {
             return image_path;
         }

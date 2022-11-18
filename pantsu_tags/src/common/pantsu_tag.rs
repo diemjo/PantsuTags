@@ -27,7 +27,10 @@ impl FromStr for PantsuTag {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut splitter = s.splitn(2, ':');
-        let first = splitter.next().unwrap();
+        let first = match splitter.next() {
+            Some(s) => Ok(s),
+            None => Err(Error::InvalidTagFormat(String::from(s))),
+        }?;
         match splitter.next() {
             Some(second) => Ok(PantsuTag { tag_name: String::from(second), tag_type: String::from(first).parse()? }),
             None => Err(Error::InvalidTagFormat(String::from(s)))

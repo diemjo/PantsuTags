@@ -81,7 +81,7 @@ impl<'a> UpdateImagesTransaction<'a> {
 
         for filename in self.filenames {
             if self.sauce.is_some() {
-                db_calls::update_file_source(&transaction, filename, self.sauce.as_ref().unwrap())?;
+                db_calls::update_file_source(&transaction, filename, self.sauce.unwrap())?;
             }
 
 

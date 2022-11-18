@@ -31,6 +31,6 @@ fn stdout_appender() -> ConsoleAppender {
 fn file_appender() -> FileAppender {
     FileAppender::builder()
         .encoder(Box::new(PatternEncoder::new("{d(%Y-%m-%d %H:%M:%S)} {l:<5} - {m}{n}")))
-        .build(CONFIGURATION.config_path.as_path())
+        .build(CONFIGURATION.log_path.as_path())
         .unwrap()
 }

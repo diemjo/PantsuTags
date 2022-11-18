@@ -26,3 +26,6 @@ pantsu_tags.yaml
 
 # log files
 *.log
+
+# test dirs
+test/

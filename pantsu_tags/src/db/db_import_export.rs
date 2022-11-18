@@ -21,11 +21,10 @@ pub(crate) fn import_db_file(pdb: &mut PantsuDB, file: &Path) -> Result<()> {
             _ => Err(Error::InvalidImportFileFormat(common::get_path(file), Some(Box::new(e))))
          })?;
     for (name, sauce, tags) in images {
-        let local_image = pdb.get_image_transaction(&name).execute()?;
-        if local_image.is_none() {
-            continue;
-        }
-        let local_image = local_image.unwrap();
+        let local_image = match pdb.get_image_transaction(&name).execute()? {
+            Some(image) => image,
+            None => continue
+        };
         let mut transaction = pdb.update_images_transaction()
             .for_image(&name)
             .add_tags(&tags);

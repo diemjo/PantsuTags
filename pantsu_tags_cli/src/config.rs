@@ -9,7 +9,7 @@ use crate::AppError;
 pub struct AppConfig {
     pub library_path: PathBuf,
     pub database_path: PathBuf,
-    pub config_path: PathBuf
+    pub log_path: PathBuf
 }
 
 impl AppConfig {
@@ -17,7 +17,7 @@ impl AppConfig {
     pub fn load_config() -> Self {
         Figment::from(Serialized::defaults(AppConfig::default()))
             .merge(Yaml::file("/etc/pantsu_tags/config.yaml"))
-            .merge(Yaml::file(BaseDirs::new().unwrap().config_dir().join("pantsu_tags.yaml").as_path()))
+            .merge(Yaml::file(BaseDirs::new().expect("No Config Directory found").config_dir().join("pantsu_tags.yaml").as_path()))
             .merge(Yaml::file("./pantsu_tags.yaml"))
             .extract()
             .or_else(|e|Err(AppError::ConfigError(e)))
@@ -30,7 +30,7 @@ impl Default for AppConfig {
         AppConfig {
             library_path: PathBuf::from("./test_image_lib"), //file_handler::default_lib_dir(),
             database_path: PathBuf::from("./pantsu_tags.db"), //file_handler::default_db_dir()
-            config_path: PathBuf::from("./pantsu_tags.log")
+            log_path: PathBuf::from("./pantsu_tags.log")
         }
     }
 }

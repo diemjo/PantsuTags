@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 use rusqlite::{Connection};
 
 use crate::common::error::Result;
-use crate::{common, Error, file_handler};
+use crate::{common, Error};
 use crate::db::transactions::{DeleteImagesTransaction, InsertImagesTransaction, SelectImagesTransaction, SelectImageTransaction, SelectTagsTransaction, UpdateImagesTransaction};
 
 mod db_calls;
@@ -31,11 +31,11 @@ pub struct PantsuDB {
 
 impl PantsuDB {
 
-    pub fn default() -> Result<PantsuDB> {
+    /*pub fn default() -> Result<PantsuDB> {
         let mut data_dir = file_handler::default_db_dir();
         data_dir.push("pantsu_tags.db");
         PantsuDB::new(&data_dir)
-    }
+    }*/
 
     pub fn new(db_path: &Path) -> Result<PantsuDB> {
         let mut path_buf = PathBuf::from(db_path);
@@ -402,7 +402,7 @@ mod tests {
 
         add_test_image2(&mut pdb).unwrap();
 
-        let file = PathBuf::from("./test_db_export.txt");
+        let file = PathBuf::from("./test/test_db_export.txt");
 
         pdb.import_db_file(file.as_path()).unwrap();
 
@@ -424,7 +424,7 @@ mod tests {
         let mut pdb = get_pantsu_db(Some(std::env::current_dir().unwrap().as_path())).unwrap();
         pdb.clear().unwrap();
 
-        let file = PathBuf::from("./test_db_export_fail.txt");
+        let file = PathBuf::from("./test/test_db_export_fail.txt");
         assert!(match pdb.import_db_file(file.as_path()).unwrap_err() {
             e @Error::InvalidImportFileFormat(_, _) => { println!("{}", e); true },
             _ => false
@@ -437,7 +437,7 @@ mod tests {
         let mut pdb = get_pantsu_db(Some(std::env::current_dir().unwrap().as_path())).unwrap();
         pdb.clear().unwrap();
 
-        let file = PathBuf::from("./test_db_export_fail2.txt");
+        let file = PathBuf::from("./test/test_db_export_fail2.txt");
         assert!(match pdb.import_db_file(file.as_path()).unwrap_err() {
             e @Error::InvalidImportFileFormat(_, _) => { println!("{:?}", e); true },
             _ => false
