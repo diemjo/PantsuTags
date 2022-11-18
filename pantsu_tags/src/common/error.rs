@@ -60,6 +60,9 @@ pub enum Error {
     #[error("Error creating file {1}: {0}")]
     FileCreateError(#[source] std::io::Error, String),
 
+    #[error("Error writing to file {1}: {0}")]
+    FileWriteError(#[source] std::io::Error, String),
+
     #[error("Error creating dir {1}: {0}")]
     DirectoryCreateError(#[source] std::io::Error, String),
 

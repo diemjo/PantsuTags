@@ -89,6 +89,10 @@ impl PantsuDB {
     pub fn import_db_file(&mut self, import_file_path: &Path) -> Result<()> {
         db_import_export::import_db_file(self, import_file_path)
     }
+
+    pub fn export_db_file(&mut self, export_file_path: &Path) -> Result<()> {
+        db_import_export::export_db_file(self, export_file_path)
+    }
 }
 
 #[cfg(test)]
@@ -402,7 +406,7 @@ mod tests {
 
         add_test_image2(&mut pdb).unwrap();
 
-        let file = PathBuf::from("./test/test_db_export.txt");
+        let file = PathBuf::from("./test/test_db_import.txt");
 
         pdb.import_db_file(file.as_path()).unwrap();
 
@@ -424,7 +428,7 @@ mod tests {
         let mut pdb = get_pantsu_db(Some(std::env::current_dir().unwrap().as_path())).unwrap();
         pdb.clear().unwrap();
 
-        let file = PathBuf::from("./test/test_db_export_fail.txt");
+        let file = PathBuf::from("./test/test_db_import_fail.txt");
         assert!(match pdb.import_db_file(file.as_path()).unwrap_err() {
             e @Error::InvalidImportFileFormat(_, _) => { println!("{}", e); true },
             _ => false
@@ -437,11 +441,66 @@ mod tests {
         let mut pdb = get_pantsu_db(Some(std::env::current_dir().unwrap().as_path())).unwrap();
         pdb.clear().unwrap();
 
-        let file = PathBuf::from("./test/test_db_export_fail2.txt");
+        let file = PathBuf::from("./test/test_db_import_fail2.txt");
         assert!(match pdb.import_db_file(file.as_path()).unwrap_err() {
             e @Error::InvalidImportFileFormat(_, _) => { println!("{:?}", e); true },
             _ => false
         });
+    }
+
+    #[test]
+    #[serial]
+    fn db_export_file() {
+        let mut pdb = get_pantsu_db(Some(std::env::current_dir().unwrap().as_path())).unwrap();
+        pdb.clear().unwrap();
+
+        let tags_to_add1 = vec![
+            "general:Haha".parse().unwrap(),
+            "artist:Hehe".parse().unwrap(),
+            "character:Hihi".parse().unwrap(),
+            "general:Hoho".parse().unwrap()
+        ];
+        let sauce1_update = Sauce::Match("https://export.url.com/final".to_string());
+        add_test_image(&mut pdb).unwrap();
+        pdb.update_images_transaction()
+            .for_image(&get_test_image().get_filename())
+            .add_tags(&tags_to_add1)
+            .update_sauce(&sauce1_update)
+            .execute()
+            .unwrap();
+
+        let tags_to_add2 = vec![
+            "general:Haha2".parse().unwrap(),
+            "artist:Hehe2".parse().unwrap(),
+            "character:Hihi2".parse().unwrap(),
+        ];
+        add_test_image2(&mut pdb).unwrap();
+        pdb.update_images_transaction()
+            .for_image(&get_test_image2().get_filename())
+            .add_tags(&tags_to_add2)
+            .execute()
+            .unwrap();
+        add_test_image3(&mut pdb).unwrap();
+
+        let file = PathBuf::from("./test/test_db_export.txt");
+
+        pdb.export_db_file(file.as_path()).unwrap();
+        
+        pdb.clear().unwrap();
+        add_test_image(&mut pdb).unwrap();
+        add_test_image2(&mut pdb).unwrap();
+        pdb.import_db_file(file.as_path()).unwrap();
+
+        let img1 = pdb.get_image_transaction(&get_test_image().get_filename()).execute().unwrap().unwrap();
+        let sauce1 = img1.get_sauce();
+        assert_eq!(sauce1, &sauce1_update);
+
+        let img2 = pdb.get_image_transaction(&get_test_image2().get_filename()).execute().unwrap().unwrap();
+        let sauce2 = img2.get_sauce();
+        assert_eq!(sauce2, get_test_image2().get_sauce());
+
+        let img3 = pdb.get_image_transaction(&get_test_image3().get_filename()).execute().unwrap();
+        assert_eq!(img3, None);
     }
 
     fn get_pantsu_db(path: Option<&Path>) -> Result<PantsuDB, Error> {
@@ -469,11 +528,21 @@ mod tests {
             .execute()
     }
 
+    fn add_test_image3(pdb: &mut PantsuDB) -> Result<(), Error> {
+        pdb.add_images_transaction()
+            .add_image(&get_test_image3())
+            .execute()
+    }
+
     fn get_test_image() -> ImageHandle {
         ImageHandle::new(String::from("1b64e362cdf968d9-c1fc07e23e05e2fc0be39ce8cc88f8044fcf.jpg"), Sauce::NotChecked, (100, 200))
     }
 
     fn get_test_image2() -> ImageHandle {
         ImageHandle::new(String::from("c3811874f801fd63-03f07d07b03b05f3370670df0db0ff037037.jpg"), Match(String::from("http://real.url")), (0, 0))
+    }
+
+    fn get_test_image3() -> ImageHandle {
+        ImageHandle::new(String::from("000011152151fec3-03f07d07b03b05f3370670df0db0ff000000.jpg"), Sauce::NotExisting, (4269, 1337))
     }
 }
