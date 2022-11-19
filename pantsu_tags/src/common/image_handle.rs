@@ -1,7 +1,8 @@
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::Hash;
 use std::path::Path;
-use crate::common;
+use std::str::FromStr;
+use crate::{common, Error};
 use crate::image_similarity::NamedImage;
 use crate::Sauce::{NotExisting, NotChecked, Match};
 
@@ -39,11 +40,7 @@ impl ImageHandle {
 
 impl Display for ImageHandle {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}: res={:>12}, sauce='{}'", self.filename, format!("({},{})", self.file_res.0, self.file_res.1), match self.get_sauce() {
-            Match(url) => url,
-            NotExisting => NOT_EXISTING_FLAG,
-            NotChecked => NOT_CHECKED_FLAG,
-        })
+        write!(f, "{}: res={:>12}, sauce='{}'", self.filename, format!("({},{})", self.file_res.0, self.file_res.1), self.get_sauce())
     }
 }
 
@@ -78,27 +75,28 @@ impl Sauce {
     }
 }
 
-/*impl ToSql for Sauce {
-    fn to_sql(&self) -> rusqlite::Result<ToSqlOutput<'_>> {
-        let sql = match self {
-            Match(sauce) => ToSqlOutput::from(sauce.as_str()),
-            NotExisting => ToSqlOutput::from(NOT_EXISTING_FLAG),
-            NotChecked => ToSqlOutput::from(NOT_CHECKED_FLAG)
-        };
-        rusqlite::Result::Ok(sql)
+impl FromStr for Sauce {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            NOT_EXISTING_FLAG => Ok(Sauce::NotExisting),
+            NOT_CHECKED_FLAG => Ok(Sauce::NotChecked),
+            other => Ok(Sauce::Match(other.to_string()))
+            // only match http(s) urls?
+        }
     }
 }
 
-impl FromSql for Sauce {
-    fn column_result(value: ValueRef<'_>) -> FromSqlResult<Self> {
-        let row = match value.as_str().unwrap() {
-            NOT_EXISTING_FLAG => NotExisting,
-            NOT_CHECKED_FLAG => NotChecked,
-            sauce => Match(String::from(sauce))
-        };
-        FromSqlResult::Ok(row)
+impl Display for Sauce {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", match self {
+            Sauce::Match(v) => v,
+            Sauce::NotChecked => NOT_CHECKED_FLAG,
+            Sauce::NotExisting => NOT_EXISTING_FLAG
+        })
     }
-}*/
+}
 
 pub const EXISTING_FLAG: &str =
     "EXISTING";

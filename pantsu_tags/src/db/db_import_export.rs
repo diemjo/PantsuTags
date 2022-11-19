@@ -2,8 +2,6 @@ use crate::ImageHandle;
 use crate::PantsuTag;
 use crate::Sauce;
 use crate::Error;
-use crate::common::image_handle::NOT_CHECKED_FLAG;
-use crate::common::image_handle::NOT_EXISTING_FLAG;
 use std::io::Write;
 use std::path::Path;
 use std::str::FromStr;
@@ -59,11 +57,7 @@ fn encode_image_info(pdb: &PantsuDB, i: ImageHandle) -> Result<String> {
         .for_image(i.get_filename())
         .execute()?;
     let name = i.get_filename();
-    let sauce = match i.get_sauce() {
-        Sauce::Match(m) => m,
-        Sauce::NotExisting => Sauce::NotExisting.get_type(),
-        Sauce::NotChecked => Sauce::NotChecked.get_type(),
-    };
+    let sauce = i.get_sauce().to_string();
     let tags = tags.iter().map(|t| t.to_string()).collect::<Vec<String>>().join(",");
     Ok(format!("{},{},{}", name, sauce, tags))
 }
@@ -74,17 +68,9 @@ fn decode_image_info(file: &Path, line: String) -> Result<(String, Sauce, Vec<Pa
         return Err(Error::InvalidImportFileFormat(common::get_path(file), None));
     }
     let name = items[0].to_string();
-    let sauce = parse_image_sauce(items[1]);
+    let sauce = Sauce::from_str(items[1])?;
     let tags = parse_image_tags(items[2])?;
     Ok((name, sauce, tags))
-}
-
-fn parse_image_sauce(value: &str) -> Sauce {
-    match value {
-        NOT_CHECKED_FLAG => Sauce::NotChecked,
-        NOT_EXISTING_FLAG => Sauce::NotExisting,
-        sauce => Sauce::Match(sauce.to_string())
-    }
 }
 
 fn parse_image_tags(value: &str) -> Result<Vec<PantsuTag>> {
