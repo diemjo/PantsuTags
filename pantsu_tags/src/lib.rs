@@ -55,6 +55,7 @@ pub fn get_sauce_tags(sauce: &SauceMatch) -> Result<Vec<PantsuTag>> {
 mod tests {
     use std::io::Cursor;
     use std::path::{Path, PathBuf};
+    use std::str::FromStr;
     use crate::{PantsuDB, Sauce};
     use serial_test::serial;
     use crate::image_similarity::NamedImage;
@@ -73,7 +74,7 @@ mod tests {
         let best_match = &sauces[0];
         // in general, you would want to check the similarity here
         let tags = crate::get_sauce_tags(&best_match).unwrap();
-        pdb.update_images_transaction().for_image(new_image.get_name()).update_sauce(&Sauce::Match(best_match.link.clone())).add_tags(&tags).execute().unwrap();
+        pdb.update_images_transaction().for_image(new_image.get_name()).update_sauce(&Sauce::from_str(&best_match.link).unwrap()).add_tags(&tags).execute().unwrap();
     }
 
     // todo: this test does not really make sense anymore, since import_image() will always succeed even if images are similar. Move to image_similarity module and make into proper test

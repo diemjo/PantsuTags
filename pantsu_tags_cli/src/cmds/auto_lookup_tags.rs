@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::str::FromStr;
 use std::{io, iter};
 use std::path::{PathBuf};
 use colored::Colorize;
@@ -62,7 +63,7 @@ fn auto_add_tags_one_image(pdb: &mut PantsuDB, image: &ImageHandle) -> AppResult
                 let tags = pantsu_tags::get_sauce_tags(sauce)?;
                 pdb.update_images_transaction()
                     .for_image(image.get_filename())
-                    .update_sauce(&Sauce::Match(sauce.link.clone()))
+                    .update_sauce(&Sauce::from_str(&sauce.link)?)
                     .add_tags(&tags)
                     .execute()?;
                 info!("Set sauce '{}' to image: '{}'", sauce.link.clone(), image.get_filename());
@@ -117,7 +118,7 @@ fn resolve_sauce_unsure(pdb: &mut PantsuDB, images_to_resolve: Vec<SauceUnsure>,
                 let tags = pantsu_tags::get_sauce_tags(correct_sauce)?;
                 pdb.update_images_transaction()
                     .for_image(image.image_handle.get_filename())
-                    .update_sauce(&Sauce::Match(correct_sauce.link.clone()))
+                    .update_sauce(&Sauce::from_str(&correct_sauce.link)?)
                     .add_tags(&tags)
                     .execute()?;
                 stats.success += 1;

@@ -100,13 +100,13 @@ mod tests {
     use std::collections::HashSet;
     use std::iter::FromIterator;
     use std::path::{Path, PathBuf};
+    use std::str::FromStr;
     use crate::common::error::Error;
     use crate::common::image_handle::ImageHandle;
     use crate::db::PantsuDB;
 
     use serial_test::serial;
     use crate::{PantsuTag, PantsuTagType, Sauce};
-    use crate::Sauce::Match;
 
     #[test]
     #[serial]
@@ -133,7 +133,7 @@ mod tests {
         add_test_image(&mut pdb).unwrap();
         pdb.update_images_transaction()
             .for_image(get_test_image().get_filename())
-            .update_sauce(&Match(String::from("https://fake.url")))
+            .update_sauce(&Sauce::from_str("https://fake.url").unwrap())
             .execute()
             .unwrap();
         assert_eq!(pdb.get_image_transaction(img.get_filename())
@@ -141,7 +141,7 @@ mod tests {
                        .unwrap()
                        .unwrap()
                        .get_sauce(),
-                   &Match(String::from("https://fake.url"))
+                   &Sauce::from_str("https://fake.url").unwrap()
         );
     }
 
@@ -412,7 +412,7 @@ mod tests {
 
         let img1 = pdb.get_image_transaction(&get_test_image().get_filename()).execute().unwrap().unwrap();
         let sauce1 = img1.get_sauce();
-        assert_eq!(sauce1, &Sauce::Match("domain.found.hehe/cool/tags?cool=yes".to_string()));
+        assert_eq!(sauce1, &Sauce::from_str("domain.found.hehe/cool/tags?cool=yes").unwrap());
 
         let img2 = pdb.get_image_transaction(&get_test_image2().get_filename()).execute().unwrap().unwrap();
         let sauce2 = img2.get_sauce();
@@ -460,7 +460,7 @@ mod tests {
             "character:Hihi".parse().unwrap(),
             "general:Hoho".parse().unwrap()
         ];
-        let sauce1_update = Sauce::Match("https://export.url.com/final".to_string());
+        let sauce1_update = Sauce::from_str("https://export.url.com/final").unwrap();
         add_test_image(&mut pdb).unwrap();
         pdb.update_images_transaction()
             .for_image(&get_test_image().get_filename())
@@ -539,7 +539,7 @@ mod tests {
     }
 
     fn get_test_image2() -> ImageHandle {
-        ImageHandle::new(String::from("c3811874f801fd63-03f07d07b03b05f3370670df0db0ff037037.jpg"), Match(String::from("http://real.url")), (0, 0))
+        ImageHandle::new(String::from("c3811874f801fd63-03f07d07b03b05f3370670df0db0ff037037.jpg"), Sauce::from_str("http://real.url").unwrap(), (0, 0))
     }
 
     fn get_test_image3() -> ImageHandle {

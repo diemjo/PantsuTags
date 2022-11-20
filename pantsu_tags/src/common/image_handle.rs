@@ -2,6 +2,8 @@ use std::fmt::{Debug, Display, Formatter};
 use std::hash::Hash;
 use std::path::Path;
 use std::str::FromStr;
+use reqwest::Url;
+
 use crate::{common, Error};
 use crate::image_similarity::NamedImage;
 use crate::Sauce::{NotExisting, NotChecked, Match};
@@ -82,7 +84,8 @@ impl FromStr for Sauce {
         match s {
             NOT_EXISTING_FLAG => Ok(Sauce::NotExisting),
             NOT_CHECKED_FLAG => Ok(Sauce::NotChecked),
-            other => Ok(Sauce::Match(other.to_string()))
+            other if Url::parse(other).is_ok() => Ok(Sauce::Match(other.to_string())),
+            other => Err(Error::InvalidSauce(other.to_string()))
             // only match http(s) urls?
         }
     }

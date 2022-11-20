@@ -203,7 +203,8 @@ mod query_helpers {
             ImageHandle::new(
                 row.get(0)?,
                 match row.get::<usize, String>(1)?.as_str() {
-                    EXISTING_FLAG => Sauce::Match(row.get(2)?),
+                    EXISTING_FLAG => Sauce::from_str(row.get::<usize, String>(2)?.as_str())
+                        .or_else(|e| Err(rusqlite::Error::FromSqlConversionFailure(0, Type::Text, Box::new(e))))?,
                     NOT_EXISTING_FLAG => Sauce::NotExisting,
                     NOT_CHECKED_FLAG => Sauce::NotChecked,
                     s => return Err(rusqlite::Error::FromSqlConversionFailure(0, Type::Text, Box::new(Error::InvalidTagType(s.to_string()))))

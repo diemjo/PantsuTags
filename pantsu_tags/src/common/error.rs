@@ -19,6 +19,9 @@ pub enum Error {
     #[error("Failed to parse html, maybe the website layout changed?")]
     HtmlParseError,
 
+    #[error("Sauce value is not a valid URL: {0}")]
+    InvalidSauce(String),
+
     // pantsu tag database errors
     #[error("Primary key constraint error: {0}")]
     SQLPrimaryKeyError(#[source] rusqlite::Error),
