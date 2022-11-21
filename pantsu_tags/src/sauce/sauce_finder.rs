@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use futures::{stream, StreamExt};
 use reqwest::multipart::Form;
-use reqwest::{blocking, Client};
+use reqwest::Client;
 use select::document::Document;
 use select::node::Node;
 use select::predicate::{Attr, Name};
@@ -32,16 +32,6 @@ pub async fn find_sauce(image_path: PathBuf) -> Result<Vec<SauceMatch>> {
     let response = response.text().await?;
     let html = Document::from(response.as_str());
     extract_sauce(&html)
-}
-
-// todo: remove?
-fn get_thumbnail_link(sauce: &SauceMatch) -> Result<String> {
-    let response = blocking::get(&sauce.link)?;
-    net::check_status(response.status())?;
-    let html = Document::from(response.text()?.as_str());
-    let image = html.find(Attr("id", "image")).next().ok_or(Error::HtmlParseError)?; // thumbnail html element should always exist
-    let link = image.attr("src").ok_or(Error::HtmlParseError)?;
-    Ok(link.to_owned())
 }
 
 pub fn get_thumbnails(sauces: &Vec<SauceMatch>) -> Result<Vec<TmpFile>> {

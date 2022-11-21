@@ -28,12 +28,6 @@ impl Drop for TmpFile {
     }
 }
 
-pub fn get_tmp_dir(sub_dir_name: &str) -> Result<PathBuf> {
-    let rt = tokio::runtime::Runtime::new()
-        .or_else(|e| Err(Error::TokioInitError(e)))?;
-    rt.block_on(tmp_dir_async::get_tmp_dir(sub_dir_name))
-}
-
 pub mod tmp_dir_async {
     use super::*;
 
