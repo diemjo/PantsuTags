@@ -1,10 +1,11 @@
 use std::fs::File;
-use std::io;
+use std::io::{self, ErrorKind};
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use image::GenericImageView;
 use image_compressor::Factor;
 use image_compressor::compressor::Compressor;
+use log::warn;
 use tokio::task;
 use crate::common::tmp_dir::TmpFile;
 use crate::common::tmp_dir_async;
@@ -76,11 +77,13 @@ pub async fn prepare_image(image_path: PathBuf) -> Result<ImagePrepared> {
 }
 
 fn compress_image(image_path: &Path, res_dir: &Path, factor_func: fn(u32, u32, u64) -> Factor) -> Result<ImagePrepared> {
-    print!("  (Compressing image ");   // hide the filename that is printed by compress_to_jpg()
     let comp = Compressor::new(image_path, res_dir, factor_func);
     let res_image = comp.compress_to_jpg()
-        .or_else(|_| Err(Error::CompressImageError(None)))?;
-    println!(")");
+        .or_else(|e| {
+            compress_image_try_fix_error(image_path, res_dir, e)?;
+            comp.compress_to_jpg() // try again
+                .or(Err(Error::CompressImageError(None)))
+        })?;
     let res_image = ImagePrepared::new_tmp(res_image);
     let res_metadata = get_image_metadata(res_image.get_path())
         .or_else(|_| Err(Error::ImageLoadError(common::get_path(image_path))))?;
@@ -88,6 +91,21 @@ fn compress_image(image_path: &Path, res_dir: &Path, factor_func: fn(u32, u32, u
         return Ok(res_image)
     }
     Err(Error::ImageTooBig(common::get_path(image_path)))
+}
+
+fn compress_image_try_fix_error(image_path: &Path, res_dir: &Path, error: Box<dyn std::error::Error>) -> Result<()> {
+    let io_err = error.downcast_ref::<std::io::Error>()
+        .ok_or(Error::CompressImageError(None))?;
+    if let ErrorKind::AlreadyExists = io_err.kind() { // remove old file to retry compression
+        let file_name = image_path.file_name().and_then(|n| n.to_str())
+            .ok_or(Error::CompressImageError(None))?;
+        let target_path = Path::new(res_dir).join(file_name);
+        std::fs::remove_file(&target_path)
+            .or(Err(Error::CompressImageError(None)))?;
+        warn!("Removed file {} to compress image to that location", common::get_path(&target_path));
+        return Ok(());
+    }
+    Err(Error::CompressImageError(None))
 }
 
 fn get_image_metadata(image_path: &Path) -> io::Result<ImageMetadata> {
