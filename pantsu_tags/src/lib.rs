@@ -6,12 +6,13 @@ use crate::file_handler::import;
 pub use crate::common::error::Error;
 pub use crate::common::error::Result;
 pub use crate::common::image_handle::ImageHandle;
-pub use crate::common::image_handle::Sauce;
+pub use crate::sauce::Sauce;
 pub use crate::common::pantsu_tag::{PantsuTag, PantsuTagType};
 pub use crate::common::tmp_dir::TmpFile;
 use crate::image_similarity::ImageToImport;
 pub use crate::sauce::SauceMatch;
 pub use crate::sauce::get_thumbnails;
+pub use crate::sauce::url_from_str;
 
 mod sauce;
 mod common;
@@ -55,14 +56,13 @@ pub async fn get_sauce_tags(sauce: &SauceMatch) -> Result<Vec<PantsuTag>> {
 mod tests {
     use std::io::Cursor;
     use std::path::{Path, PathBuf};
-    use std::str::FromStr;
-    use crate::{PantsuDB, Sauce};
+    use crate::{PantsuDB, Sauce, sauce};
     use serial_test::serial;
     use crate::image_similarity::NamedImage;
 
-    #[test]
+    #[tokio::test]
     #[serial]
-    fn test_add_image() {
+    async fn test_add_image() {
         let mut db_path = std::env::current_dir().unwrap();
         db_path.push("pantsu_tags.db");
         let mut pdb = PantsuDB::new(&db_path).unwrap();
@@ -70,11 +70,11 @@ mod tests {
 
         let new_image = crate::check_image(&mut pdb, &image_path).unwrap();
         crate::import_image(&mut pdb, Path::new("./test_image_lib"), &new_image, true).unwrap();
-        let sauces = crate::get_image_sauces(Path::new("./test_image_lib"), &new_image.image_handle).unwrap();
+        let sauces = crate::get_image_sauces(Path::new("./test_image_lib"), &new_image.image_handle).await.unwrap();
         let best_match = &sauces[0];
         // in general, you would want to check the similarity here
-        let tags = crate::get_sauce_tags(&best_match).unwrap();
-        pdb.update_images_transaction().for_image(new_image.get_name()).update_sauce(&Sauce::from_str(&best_match.link).unwrap()).add_tags(&tags).execute().unwrap();
+        let tags = crate::get_sauce_tags(&best_match).await.unwrap();
+        pdb.update_images_transaction().for_image(new_image.get_name()).update_sauce(&Sauce::Match(sauce::url_from_str(&best_match.link).unwrap())).add_tags(&tags).execute().unwrap();
     }
 
     // todo: this test does not really make sense anymore, since import_image() will always succeed even if images are similar. Move to image_similarity module and make into proper test

@@ -60,6 +60,14 @@ fn main() -> Result<(), AppError> {
         Args::AutoLookupTags(args) => {
             info!("Running command 'auto-lookup-tags'");
             cmds::auto_lookup_tags(args.images, args.sauce_existing, args.sauce_not_existing, args.sauce_not_checked, args.no_feh)
+        },
+        Args::ImportTags(args) => {
+            info!("Running command 'import-tags'");
+            cmds::import_tags(&args.file)
+        },
+        Args::ExportTags(args) => {
+            info!("Running command 'export-tags'");
+            cmds::export_tags(&args.file)
         }
     };
 

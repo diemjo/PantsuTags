@@ -3,7 +3,8 @@ use std::iter::FromIterator;
 use rusqlite::Connection;
 use crate::db::db_calls;
 use crate::error::Result;
-use crate::{PantsuTag, Sauce};
+use crate::PantsuTag;
+use crate::sauce::Sauce;
 
 pub struct UpdateImagesTransaction<'a> {
     connection: &'a mut Connection,

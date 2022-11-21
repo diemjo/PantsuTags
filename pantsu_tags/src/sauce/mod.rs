@@ -1,14 +1,64 @@
 use std::cmp::Ordering;
+use std::fmt::Display;
+use std::fmt::Formatter;
+use crate::error::{Error, Result};
 
 mod tag_finder;
 mod sauce_finder;
 mod image_preparer;
 mod net;
 
+use reqwest::Url;
 pub use sauce_finder::find_sauce;
 pub use sauce_finder::get_thumbnails;
 pub use tag_finder::find_tags_gelbooru;
 
+pub fn url_from_str(url: &str) -> Result<Url> {
+    Url::parse(url).or_else(|_| Err(Error::InvalidSauce(url.to_string())))
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub enum Sauce {
+    Match(Url),
+    NotExisting,
+    NotChecked
+}
+
+impl Sauce {
+    pub fn get_type(&self) -> &str {
+        match self {
+            Sauce::Match(_) => EXISTING_FLAG,
+            Sauce::NotChecked => NOT_CHECKED_FLAG,
+            Sauce::NotExisting => NOT_EXISTING_FLAG,
+        }
+    }
+
+    pub fn get_value(&self) -> Option<&str> {
+        match self {
+            Sauce::Match(url) => Some(url.as_str()),
+            Sauce::NotChecked => None,
+            Sauce::NotExisting => None,
+        }
+    }
+}
+
+impl Display for Sauce {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", match self {
+            Sauce::Match(v) => v.as_str(),
+            Sauce::NotChecked => NOT_CHECKED_FLAG,
+            Sauce::NotExisting => NOT_EXISTING_FLAG
+        })
+    }
+}
+
+pub const EXISTING_FLAG: &str =
+    "EXISTING";
+pub const NOT_EXISTING_FLAG: &str =
+    "NOT_EXISTING";
+
+pub const NOT_CHECKED_FLAG: &str =
+    "NOT_CHECKED";
 
 #[derive(Debug, Eq)]
 pub struct SauceMatch {
@@ -60,22 +110,22 @@ mod tests {
         image_path
     }
 
-    #[test]
-    fn find_sauce() {
+    #[tokio::test]
+    async fn find_sauce() {
         let sauce_link = "http://gelbooru.com/index.php?page=post&s=list&md5=4f76b8d52983af1d28b1bf8d830d684e";
         let image_link = "https://img1.gelbooru.com/images/4f/76/4f76b8d52983af1d28b1bf8d830d684e.png";
         let path = prepare_image(image_link);
 
-        let sauces = sauce_finder::find_sauce(path).unwrap();
+        let sauces = sauce_finder::find_sauce(path).await.unwrap();
         assert_eq!(sauces[0].link, sauce_link);
         assert_eq!(sauces[0].similarity, 96);
         assert_eq!(sauces[0].resolution, (533, 745));
     }
 
-    #[test]
-    fn find_tag() {
+    #[tokio::test]
+    async fn find_tag() {
         let url = "http://gelbooru.com/index.php?page=post&s=list&md5=4f76b8d52983af1d28b1bf8d830d684e";
-        let tags = tag_finder::find_tags_gelbooru(url).unwrap();
+        let tags = tag_finder::find_tags_gelbooru(url).await.unwrap();
         assert!(tags.iter().any(|tag| tag.tag_name.eq("loli") && matches!(tag.tag_type, PantsuTagType::General)));
         assert!(tags.iter().any(|tag| tag.tag_name.eq("stuffed dinosaur") && matches!(tag.tag_type, PantsuTagType::General)));
         assert!(tags.iter().any(|tag| tag.tag_name.eq("ichihaya") && matches!(tag.tag_type, PantsuTagType::Artist)));
@@ -85,9 +135,9 @@ mod tests {
         assert!(!tags.iter().any(|tag| tag.tag_name.eq("large breasts") && matches!(tag.tag_type, PantsuTagType::Source)));
     }
 
-    #[test]
+    #[tokio::test]
     #[ignore]
-    fn find_multiple_tags() {
+    async fn find_multiple_tags() {
         let links: Vec<&str> = vec![
             "https://gelbooru.com/index.php?page=post&s=list&md5=b3b2aa651df45f6cd74f9c45fb715c79",
             "https://gelbooru.com/index.php?page=post&s=view&id=6261499",
@@ -96,15 +146,15 @@ mod tests {
         ];
         let mut tags: Vec<Vec<PantsuTag>> = Vec::new();
         for link in links {
-            tags.push(tag_finder::find_tags_gelbooru(link).unwrap());
+            tags.push(tag_finder::find_tags_gelbooru(link).await.unwrap());
         }
         for tag in tags {
             assert!(tag.iter().any(|t| t.tag_name.eq("original") && matches!(t.tag_type, PantsuTagType::Source)))
         }
     }
 
-    #[test]
-    fn find_tags_rating() {
+    #[tokio::test]
+    async fn find_tags_rating() {
         let links: Vec<(&str, &str)> = vec![
             ("https://gelbooru.com/index.php?page=post&s=view&id=6250367&tags=rurudo", "Safe"),
             ("https://gelbooru.com/index.php?page=post&s=view&id=5558687&tags=rurudo", "Questionable"),
@@ -112,7 +162,7 @@ mod tests {
         ];
         let mut tags: Vec<(Vec<PantsuTag>, &str)> = Vec::new();
         for link in links {
-            tags.push((tag_finder::find_tags_gelbooru(link.0).unwrap(), link.1));
+            tags.push((tag_finder::find_tags_gelbooru(link.0).await.unwrap(), link.1));
         }
         for tag in tags {
             assert!(tag.0.iter().any(|t| t.tag_name.eq(tag.1) && matches!(t.tag_type, PantsuTagType::Rating)))

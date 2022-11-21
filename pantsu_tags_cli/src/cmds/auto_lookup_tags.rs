@@ -1,7 +1,6 @@
 use std::collections::HashSet;
-use std::str::FromStr;
 use std::{io, iter};
-use std::path::{PathBuf};
+use std::path::PathBuf;
 use colored::Colorize;
 use futures::{stream, StreamExt, TryStreamExt};
 use log::{info, warn};
@@ -90,7 +89,7 @@ async fn store_sauce_in_db(pdb: &mut PantsuDB, image: &ImageHandle, sauce_judgem
         SauceJudgement::Matching { sauce, tags } => {
             pdb.update_images_transaction()
                 .for_image(image.get_filename())
-                .update_sauce(&Sauce::from_str(&sauce.link)?)
+                .update_sauce(&Sauce::Match(pantsu_tags::url_from_str(&sauce.link)?))
                 .add_tags(&tags)
                 .execute()?;
             info!("Set sauce '{}' to image: '{}'", sauce.link.clone(), image.get_filename());
@@ -142,7 +141,7 @@ fn resolve_sauce_unsure(pdb: &mut PantsuDB, rt: Runtime, images_to_resolve: Vec<
                 let tags = rt.block_on(pantsu_tags::get_sauce_tags(correct_sauce))?;
                 pdb.update_images_transaction()
                     .for_image(image.image_handle.get_filename())
-                    .update_sauce(&Sauce::from_str(&correct_sauce.link)?)
+                    .update_sauce(&Sauce::Match(pantsu_tags::url_from_str(&correct_sauce.link)?))
                     .add_tags(&tags)
                     .execute()?;
                 stats.success += 1;

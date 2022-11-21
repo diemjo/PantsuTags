@@ -6,11 +6,11 @@ use std::io::Write;
 use std::path::Path;
 use std::str::FromStr;
 use crate::common::error::Result;
-use crate::common;
+use crate::{sauce, common};
 
 use super::PantsuDB;
 
-pub(crate) fn import_db_file(pdb: &mut PantsuDB, file: &Path) -> Result<()> {
+pub(crate) fn import_tags(pdb: &mut PantsuDB, file: &Path) -> Result<()> {
     let content = std::fs::read_to_string(file).or_else(|e| Err(Error::FileNotFound(e, common::get_path(file))))?;
     let images = content.lines()
         .filter(|l| !l.is_empty())
@@ -39,7 +39,7 @@ pub(crate) fn import_db_file(pdb: &mut PantsuDB, file: &Path) -> Result<()> {
     Ok(())
 }
 
-pub(crate) fn export_db_file(pdb: &PantsuDB, path: &Path) -> Result<()> {
+pub(crate) fn export_tags(pdb: &PantsuDB, path: &Path) -> Result<()> {
     let images = pdb.get_images_transaction()
         .execute()?;
     let lines = images.into_iter()
@@ -68,7 +68,11 @@ fn decode_image_info(file: &Path, line: String) -> Result<(String, Sauce, Vec<Pa
         return Err(Error::InvalidImportFileFormat(common::get_path(file), None));
     }
     let name = items[0].to_string();
-    let sauce = Sauce::from_str(items[1])?;
+    let sauce = match items[1] {
+        sauce::NOT_CHECKED_FLAG => Sauce::NotChecked,
+        sauce::NOT_EXISTING_FLAG => Sauce::NotExisting,
+        other => Sauce::Match(sauce::url_from_str(other)?)
+    };
     let tags = parse_image_tags(items[2])?;
     Ok((name, sauce, tags))
 }

@@ -1,12 +1,10 @@
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::Hash;
 use std::path::Path;
-use std::str::FromStr;
-use reqwest::Url;
 
-use crate::{common, Error};
+use crate::sauce::Sauce;
+use crate::common;
 use crate::image_similarity::NamedImage;
-use crate::Sauce::{NotExisting, NotChecked, Match};
 
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -52,32 +50,7 @@ impl NamedImage for ImageHandle {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub enum Sauce {
-    Match(String),
-    NotExisting,
-    NotChecked
-}
-
-impl Sauce {
-    pub fn get_type(&self) -> &str {
-        match self {
-            Match(_) => EXISTING_FLAG,
-            NotChecked => NOT_CHECKED_FLAG,
-            NotExisting => NOT_EXISTING_FLAG,
-        }
-    }
-
-    pub fn get_value(&self) -> Option<&str> {
-        match self {
-            Match(value) => Some(value.as_str()),
-            NotChecked => None,
-            NotExisting => None,
-        }
-    }
-}
-
-impl FromStr for Sauce {
+/*impl FromStr for Sauce {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -89,22 +62,4 @@ impl FromStr for Sauce {
             // only match http(s) urls?
         }
     }
-}
-
-impl Display for Sauce {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", match self {
-            Sauce::Match(v) => v,
-            Sauce::NotChecked => NOT_CHECKED_FLAG,
-            Sauce::NotExisting => NOT_EXISTING_FLAG
-        })
-    }
-}
-
-pub const EXISTING_FLAG: &str =
-    "EXISTING";
-pub const NOT_EXISTING_FLAG: &str =
-    "NOT_EXISTING";
-
-pub const NOT_CHECKED_FLAG: &str =
-    "NOT_CHECKED";
+}*/

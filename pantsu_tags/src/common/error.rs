@@ -1,4 +1,4 @@
-use std::path::{PathBuf};
+use std::{path::{PathBuf}};
 use reqwest::StatusCode;
 use crate::ImageHandle;
 
@@ -22,11 +22,14 @@ pub enum Error {
     #[error("Failed to parse html, maybe the website layout changed?")]
     HtmlParseError,
 
-    #[error("Sauce value is not a valid URL: {0}")]
+    #[error("Sauce value '{0}' is not a valid URL")]
     InvalidSauce(String),
     
     #[error("Failed to compress image")]
     CompressImageError(#[source] Option<Box<Error>>),
+    
+    #[error("Sauce type is not valid: {0}")]
+    InvalidSauceType(String),
 
     // pantsu tag database errors
     #[error("Primary key constraint error: {0}")]

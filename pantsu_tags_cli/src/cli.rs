@@ -13,6 +13,8 @@ pub enum Args {
     ImageInfos(ImageInfosArgs),
     ListImages(ListImagesArgs),
     AutoLookupTags(AutoLookupTagsArgs),
+    ImportTags(ImportTagsArgs),
+    ExportTags(ExportTagsArgs)
 }
 
 #[derive(Debug, Parser)]
@@ -102,4 +104,16 @@ pub struct AutoLookupTagsArgs {
     pub sauce_not_existing: bool,
     #[clap(short='c', long)]
     pub sauce_not_checked: bool,
+}
+
+#[derive(Debug, Parser)]
+pub struct ImportTagsArgs {
+    #[clap(short, long, parse(from_os_str))]
+    pub file: PathBuf,
+}
+
+#[derive(Debug, Parser)]
+pub struct ExportTagsArgs {
+    #[clap(short, long, parse(from_os_str))]
+    pub file: PathBuf,
 }

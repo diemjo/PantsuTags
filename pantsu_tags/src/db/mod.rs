@@ -86,12 +86,12 @@ impl PantsuDB {
         DeleteImagesTransaction::new(&mut self.conn)
     }
 
-    pub fn import_db_file(&mut self, import_file_path: &Path) -> Result<()> {
-        db_import_export::import_db_file(self, import_file_path)
+    pub fn import_tags(&mut self, import_file_path: &Path) -> Result<()> {
+        db_import_export::import_tags(self, import_file_path)
     }
 
-    pub fn export_db_file(&mut self, export_file_path: &Path) -> Result<()> {
-        db_import_export::export_db_file(self, export_file_path)
+    pub fn export_tags(&mut self, export_file_path: &Path) -> Result<()> {
+        db_import_export::export_tags(self, export_file_path)
     }
 }
 
@@ -100,13 +100,12 @@ mod tests {
     use std::collections::HashSet;
     use std::iter::FromIterator;
     use std::path::{Path, PathBuf};
-    use std::str::FromStr;
     use crate::common::error::Error;
     use crate::common::image_handle::ImageHandle;
     use crate::db::PantsuDB;
 
     use serial_test::serial;
-    use crate::{PantsuTag, PantsuTagType, Sauce};
+    use crate::{PantsuTag, PantsuTagType, Sauce, sauce};
 
     #[test]
     #[serial]
@@ -133,7 +132,7 @@ mod tests {
         add_test_image(&mut pdb).unwrap();
         pdb.update_images_transaction()
             .for_image(get_test_image().get_filename())
-            .update_sauce(&Sauce::from_str("https://fake.url").unwrap())
+            .update_sauce(&Sauce::Match(sauce::url_from_str("https://fake.url").unwrap()))
             .execute()
             .unwrap();
         assert_eq!(pdb.get_image_transaction(img.get_filename())
@@ -141,7 +140,7 @@ mod tests {
                        .unwrap()
                        .unwrap()
                        .get_sauce(),
-                   &Sauce::from_str("https://fake.url").unwrap()
+                   &Sauce::Match(sauce::url_from_str("https://fake.url").unwrap())
         );
     }
 
@@ -408,11 +407,11 @@ mod tests {
 
         let file = PathBuf::from("./test/test_db_import.txt");
 
-        pdb.import_db_file(file.as_path()).unwrap();
+        pdb.import_tags(file.as_path()).unwrap();
 
         let img1 = pdb.get_image_transaction(&get_test_image().get_filename()).execute().unwrap().unwrap();
         let sauce1 = img1.get_sauce();
-        assert_eq!(sauce1, &Sauce::from_str("domain.found.hehe/cool/tags?cool=yes").unwrap());
+        assert_eq!(sauce1, &Sauce::Match(sauce::url_from_str("http://domain.found.hehe/cool/tags?cool=yes").unwrap()));
 
         let img2 = pdb.get_image_transaction(&get_test_image2().get_filename()).execute().unwrap().unwrap();
         let sauce2 = img2.get_sauce();
@@ -429,7 +428,7 @@ mod tests {
         pdb.clear().unwrap();
 
         let file = PathBuf::from("./test/test_db_import_fail.txt");
-        assert!(match pdb.import_db_file(file.as_path()).unwrap_err() {
+        assert!(match pdb.import_tags(file.as_path()).unwrap_err() {
             e @Error::InvalidImportFileFormat(_, _) => { println!("{}", e); true },
             _ => false
         });
@@ -442,7 +441,7 @@ mod tests {
         pdb.clear().unwrap();
 
         let file = PathBuf::from("./test/test_db_import_fail2.txt");
-        assert!(match pdb.import_db_file(file.as_path()).unwrap_err() {
+        assert!(match pdb.import_tags(file.as_path()).unwrap_err() {
             e @Error::InvalidImportFileFormat(_, _) => { println!("{:?}", e); true },
             _ => false
         });
@@ -460,7 +459,7 @@ mod tests {
             "character:Hihi".parse().unwrap(),
             "general:Hoho".parse().unwrap()
         ];
-        let sauce1_update = Sauce::from_str("https://export.url.com/final").unwrap();
+        let sauce1_update = Sauce::Match(sauce::url_from_str("https://export.url.com/final").unwrap());
         add_test_image(&mut pdb).unwrap();
         pdb.update_images_transaction()
             .for_image(&get_test_image().get_filename())
@@ -484,12 +483,12 @@ mod tests {
 
         let file = PathBuf::from("./test/test_db_export.txt");
 
-        pdb.export_db_file(file.as_path()).unwrap();
+        pdb.export_tags(file.as_path()).unwrap();
         
         pdb.clear().unwrap();
         add_test_image(&mut pdb).unwrap();
         add_test_image2(&mut pdb).unwrap();
-        pdb.import_db_file(file.as_path()).unwrap();
+        pdb.import_tags(file.as_path()).unwrap();
 
         let img1 = pdb.get_image_transaction(&get_test_image().get_filename()).execute().unwrap().unwrap();
         let sauce1 = img1.get_sauce();
@@ -539,7 +538,7 @@ mod tests {
     }
 
     fn get_test_image2() -> ImageHandle {
-        ImageHandle::new(String::from("c3811874f801fd63-03f07d07b03b05f3370670df0db0ff037037.jpg"), Sauce::from_str("http://real.url").unwrap(), (0, 0))
+        ImageHandle::new(String::from("c3811874f801fd63-03f07d07b03b05f3370670df0db0ff037037.jpg"), Sauce::Match(sauce::url_from_str("http://real.url").unwrap()), (0, 0))
     }
 
     fn get_test_image3() -> ImageHandle {

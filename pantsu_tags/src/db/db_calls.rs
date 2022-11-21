@@ -112,9 +112,9 @@ pub(crate) fn get_files(connection: &Connection, included_tags: &Vec<&str>, excl
             sqlite_statements::SELECT_ALL_FILES.to_string()
         };
     let formatted_stmt = formatted_stmt.replace(sqlite_statements::SAUCE_TYPE_PLACEHOLDER, match sauce_type {
-        SauceType::Existing => crate::common::image_handle::EXISTING_FLAG,
-        SauceType::NotExisting => crate::common::image_handle::NOT_EXISTING_FLAG,
-        SauceType::NotChecked => crate::common::image_handle::NOT_CHECKED_FLAG,
+        SauceType::Existing => crate::sauce::EXISTING_FLAG,
+        SauceType::NotExisting => crate::sauce::NOT_EXISTING_FLAG,
+        SauceType::NotChecked => crate::sauce::NOT_CHECKED_FLAG,
         SauceType::Any => "%",
     });
     let mut stmt = connection.prepare(&formatted_stmt)?;
@@ -170,44 +170,34 @@ mod query_helpers {
     use std::str::FromStr;
 
     use rusqlite::{Params, Row, Statement};
-    use rusqlite::types::Type;
     use crate::common::error::Result;
-    use crate::common::image_handle::{EXISTING_FLAG, NOT_EXISTING_FLAG, NOT_CHECKED_FLAG, ImageHandle};
+    use crate::common::image_handle::ImageHandle;
+    use crate::sauce::{EXISTING_FLAG, NOT_EXISTING_FLAG, NOT_CHECKED_FLAG};
     use crate::common::pantsu_tag::PantsuTag;
-    use crate::{Error, Sauce, PantsuTagType};
+    use crate::{Error, Sauce, PantsuTagType, sauce};
 
     pub fn query_row_as_file<P: Params>(stmt: &mut Statement, params: P) -> Result<Option<ImageHandle>> {
-        let file = stmt.query_row(params, image_handle_from_row);
-         match file {
-            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
-            Ok(file) => Ok(Some(file)),
-            Err(e) => Err(e)?
+        let rows = query_rows_as_files(stmt, params)?;
+        match rows.into_iter().next() {
+            Some(i) => Ok(Some(i)),
+            None => Ok(None)
         }
     }
 
     pub fn query_rows_as_files<P: Params>(stmt: &mut Statement, params: P) -> Result<Vec<ImageHandle>> {
-        let rows: Vec<std::result::Result<ImageHandle, rusqlite::Error>> = stmt.query_map(params, image_handle_from_row)?.collect();
-        let rows: std::result::Result<Vec<ImageHandle>, rusqlite::Error> = rows.into_iter().collect();
-        Ok(rows?)
-
-        /*let mut rows = stmt.query([]).unwrap();
-    let mut files: Vec<String> = Vec::new();
-    while let Some(row) = rows.next()? {
-        files.push(row.get(0)?);
-    }
-    Ok(files)*/
+        let rows: Vec<ImageHandle> = stmt.query(params)?.and_then(image_handle_from_row).collect::<Result<Vec<ImageHandle>>>()?;
+        Ok(rows)
     }
 
-    fn image_handle_from_row(row: &Row) -> rusqlite::Result<ImageHandle> {
+    fn image_handle_from_row(row: &Row) -> Result<ImageHandle> {
         Ok(
             ImageHandle::new(
                 row.get(0)?,
                 match row.get::<usize, String>(1)?.as_str() {
-                    EXISTING_FLAG => Sauce::from_str(row.get::<usize, String>(2)?.as_str())
-                        .or_else(|e| Err(rusqlite::Error::FromSqlConversionFailure(0, Type::Text, Box::new(e))))?,
+                    EXISTING_FLAG => Sauce::Match(sauce::url_from_str(&row.get::<usize, String>(2)?)?),
                     NOT_EXISTING_FLAG => Sauce::NotExisting,
                     NOT_CHECKED_FLAG => Sauce::NotChecked,
-                    s => return Err(rusqlite::Error::FromSqlConversionFailure(0, Type::Text, Box::new(Error::InvalidTagType(s.to_string()))))
+                    s => return Err(Error::InvalidSauceType(s.to_string()))
                 },
                 (row.get(3)?, row.get(4)?)
             )
