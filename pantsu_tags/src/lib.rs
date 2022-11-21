@@ -38,17 +38,17 @@ pub fn import_image(pantsu_db: &mut PantsuDB, lib: &Path, image: &ImageToImport,
 }
 
 
-pub fn get_image_sauces(lib: &Path, image: &ImageHandle) -> Result<Vec<SauceMatch>> {
+pub async fn get_image_sauces(lib: &Path, image: &ImageHandle) -> Result<Vec<SauceMatch>> {
     let mut image_path = PathBuf::from(lib);
     image_path.push(image.get_filename());
-    let mut sauce_matches = sauce::find_sauce(image_path)?;
+    let mut sauce_matches = sauce::find_sauce(image_path).await?;
     sauce_matches.sort();
     sauce_matches.reverse();
     Ok(sauce_matches)
 }
 
-pub fn get_sauce_tags(sauce: &SauceMatch) -> Result<Vec<PantsuTag>> {
-    sauce::find_tags_gelbooru(&sauce.link)
+pub async fn get_sauce_tags(sauce: &SauceMatch) -> Result<Vec<PantsuTag>> {
+    sauce::find_tags_gelbooru(&sauce.link).await
 }
 
 #[cfg(test)]

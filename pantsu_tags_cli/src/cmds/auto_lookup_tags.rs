@@ -3,9 +3,11 @@ use std::str::FromStr;
 use std::{io, iter};
 use std::path::{PathBuf};
 use colored::Colorize;
+use futures::{stream, StreamExt, TryStreamExt};
 use log::{info, warn};
 use pantsu_tags::{ImageHandle, PantsuTag, Sauce, SauceMatch, TmpFile};
 use pantsu_tags::db::PantsuDB;
+use tokio::runtime::Runtime;
 use crate::{AppError, CONFIGURATION, feh};
 use crate::common::{AppResult, valid_filename_from_path};
 use crate::feh::FehProcesses;
@@ -15,77 +17,99 @@ const FOUND_SIMILARITY_THRESHOLD: i32 = 90;
 // sauce matches with a higher similarity are relevant. (Others will be discarded)
 const RELEVANT_SIMILARITY_THESHOLD: i32 = 45;
 
-pub fn auto_lookup_tags(image_paths: Vec<PathBuf>, sauce_existing: bool, sauce_not_existing: bool, sauce_not_checked: bool, no_feh: bool) -> AppResult<()> {
-    let mut stats = AutoTaggingStats::default();
-    let mut unsure_source_images: Vec<SauceUnsure> = Vec::new();
-    let mut pdb = PantsuDB::new(CONFIGURATION.database_path.as_path())?;
-    let images = get_images(&pdb, &image_paths, sauce_existing, sauce_not_existing, sauce_not_checked)?;
-    for image in &images {
-        let res = auto_add_tags_one_image(&mut pdb, image);
-        match res {
-            Ok(_) => {
-                stats.success += 1;
-                println!("{} - {}", "Successfully tagged image".green(), image.get_filename());
-            }
-            e@Err(AppError::LibError(_)) => {
-                return e;
-            }
-            Err(AppError::NoRelevantSauces) => {
-                stats.no_source += 1;
-                println!("{} - {}", "No source found          ".red(), image.get_filename());
-            },
-            Err(AppError::SauceUnsure(image_handle, sauce_matches)) => {
-                unsure_source_images.push(SauceUnsure {
-                    image_handle,
-                    matches: sauce_matches,
-                });
-                println!("{} - {}", "Source could be wrong    ".yellow(), image.get_filename());
-            },
-            Err(e) => {
-                eprintln!("Unexpected error: {}", e);
-                return Err(e);
-            },
-        }
-    }
+const MAX_CONCURRENT_REQUESTS: usize = 16;
 
-    resolve_sauce_unsure(&mut pdb, unsure_source_images, &mut stats, no_feh)?;
+pub fn auto_lookup_tags(image_paths: Vec<PathBuf>, sauce_existing: bool, sauce_not_existing: bool, sauce_not_checked: bool, no_feh: bool) -> AppResult<()> {
+    let pdb = PantsuDB::new(CONFIGURATION.database_path.as_path())?;
+    let images = get_images(&pdb, &image_paths, sauce_existing, sauce_not_existing, sauce_not_checked)?;
+    
+    let rt = tokio::runtime::Runtime::new()
+        .or_else(|e| Err(pantsu_tags::Error::TokioInitError(e)))?;
+    let (mut pdb, mut stats, unsure_source_images) = rt.block_on(auto_lookup_tags_async(pdb, images))?;
+
+    resolve_sauce_unsure(&mut pdb, rt, unsure_source_images, &mut stats, no_feh)?;
     println!();
     stats.print_stats();
     Ok(())
 }
 
-fn auto_add_tags_one_image(pdb: &mut PantsuDB, image: &ImageHandle) -> AppResult<()> {
-    let sauces = pantsu_tags::get_image_sauces(CONFIGURATION.library_path.as_path(), &image)?;
+
+async fn auto_lookup_tags_async(pdb: PantsuDB, images: HashSet<ImageHandle>) -> AppResult<(PantsuDB,AutoTaggingStats,Vec<SauceUnsure>)> {
+    let tagging_stats = AutoTaggingStats::default();
+    let unsure_sauces: Vec<SauceUnsure> = Vec::new();
+
+    let res = stream::iter(images)
+        .map(|image| async move {
+            let sauces = pantsu_tags::get_image_sauces(&CONFIGURATION.library_path, &image).await?;
+            let judgement = judge_sauce(&image, sauces).await?;
+            Ok((image,judgement))
+        })
+        .buffer_unordered(MAX_CONCURRENT_REQUESTS)
+        .try_fold((pdb,tagging_stats,unsure_sauces), |(mut pdb, mut stats, mut unsures), (image,judgement)| async move {
+            store_sauce_in_db(&mut pdb, &image, &judgement).await?;
+            let image_name = image.get_filename();
+            match judgement {
+                SauceJudgement::Matching { sauce: _, tags: _ } => {
+                    stats.success += 1;
+                    println!("{} - {}", "Successfully tagged image".green(), image_name);
+                }
+                SauceJudgement::Unsure(unsure) => {
+                    unsures.push(unsure);
+                    println!("{} - {}", "Source could be wrong    ".yellow(), image_name);
+                }
+                SauceJudgement::NotExisting => {
+                    stats.no_source += 1;
+                    println!("{} - {}", "No source found          ".red(), image_name);
+                }
+            }
+            Ok((pdb,stats,unsures))
+        }).await;
+
+    res
+}
+
+async fn judge_sauce(image: &ImageHandle, sauces: Vec<SauceMatch>) -> AppResult<SauceJudgement> {
     let relevant_sauces: Vec<SauceMatch> = sauces.into_iter().filter(|s| s.similarity > RELEVANT_SIMILARITY_THESHOLD).collect();
     match relevant_sauces.first() {
         Some(sauce) => {
             if sauce.similarity > FOUND_SIMILARITY_THRESHOLD {
-                let tags = pantsu_tags::get_sauce_tags(sauce)?;
-                pdb.update_images_transaction()
-                    .for_image(image.get_filename())
-                    .update_sauce(&Sauce::from_str(&sauce.link)?)
-                    .add_tags(&tags)
-                    .execute()?;
-                info!("Set sauce '{}' to image: '{}'", sauce.link.clone(), image.get_filename());
-                info!("Added tags {} to image: '{}'", PantsuTag::vec_to_string(&tags), image.get_filename());
+                let tags = pantsu_tags::get_sauce_tags(sauce).await?;
+                let sauce = relevant_sauces.into_iter().next().unwrap();
+                Ok(SauceJudgement::Matching { sauce, tags })
             }
-            else { // tags can be added in the sauce resolution
-                return Err(AppError::SauceUnsure(image.clone(), relevant_sauces));
+            else {
+                Ok(SauceJudgement::Unsure(SauceUnsure { image_handle: image.clone(), matches: relevant_sauces }))
             }
         }
-        None => { // mark in db that there are no sources for this image
+        None => Ok(SauceJudgement::NotExisting),
+    }
+}
+
+async fn store_sauce_in_db(pdb: &mut PantsuDB, image: &ImageHandle, sauce_judgement: &SauceJudgement) -> AppResult<()> {
+    match sauce_judgement {
+        SauceJudgement::Matching { sauce, tags } => {
+            pdb.update_images_transaction()
+                .for_image(image.get_filename())
+                .update_sauce(&Sauce::from_str(&sauce.link)?)
+                .add_tags(&tags)
+                .execute()?;
+            info!("Set sauce '{}' to image: '{}'", sauce.link.clone(), image.get_filename());
+            info!("Added tags {} to image: '{}'", PantsuTag::vec_to_string(&tags), image.get_filename());
+        },
+        SauceJudgement::NotExisting => { // mark in db that there are no sources for this image
             pdb.update_images_transaction()
                 .for_image(image.get_filename())
                 .update_sauce(&Sauce::NotExisting)
                 .execute()?;
             warn!("Set sauce '{}' to image: '{}'", "NOT_EXISTING", image.get_filename());
-            return Err(AppError::NoRelevantSauces);
-        }
+        },
+        SauceJudgement::Unsure(_) => {}, // tags can be added in the sauce resolution
     }
     Ok(())
 }
 
-fn resolve_sauce_unsure(pdb: &mut PantsuDB, images_to_resolve: Vec<SauceUnsure>, stats: &mut AutoTaggingStats, no_feh: bool) -> AppResult<()>{
+
+fn resolve_sauce_unsure(pdb: &mut PantsuDB, rt: Runtime, images_to_resolve: Vec<SauceUnsure>, stats: &mut AutoTaggingStats, no_feh: bool) -> AppResult<()>{
     if images_to_resolve.is_empty() {
         return Ok(());
     }
@@ -115,7 +139,7 @@ fn resolve_sauce_unsure(pdb: &mut PantsuDB, images_to_resolve: Vec<SauceUnsure>,
                     continue;
                 }
                 let correct_sauce = &image.matches[num-1];
-                let tags = pantsu_tags::get_sauce_tags(correct_sauce)?;
+                let tags = rt.block_on(pantsu_tags::get_sauce_tags(correct_sauce))?;
                 pdb.update_images_transaction()
                     .for_image(image.image_handle.get_filename())
                     .update_sauce(&Sauce::from_str(&correct_sauce.link)?)
@@ -180,6 +204,12 @@ impl AutoTaggingStats {
             println!("Source not found:    {}", self.no_source);
         }
     }
+}
+
+enum SauceJudgement {
+    Matching { sauce: SauceMatch, tags: Vec<PantsuTag> },
+    Unsure (SauceUnsure),
+    NotExisting,
 }
 
 struct SauceUnsure {

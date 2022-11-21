@@ -5,7 +5,9 @@ use std::path::{Path, PathBuf};
 use image::GenericImageView;
 use image_compressor::Factor;
 use image_compressor::compressor::Compressor;
-use crate::common::tmp_dir::{self, TmpFile};
+use tokio::task;
+use crate::common::tmp_dir::TmpFile;
+use crate::common::tmp_dir_async;
 use crate::{Error, Result, common};
 
 const COMPRESSED_TMP_SUBDIR: &str = "compressed-images";
@@ -47,34 +49,37 @@ impl ImagePrepared {
     }
 }
 
-pub fn prepare_image(image_path: PathBuf) -> Result<ImagePrepared> {
+pub async fn prepare_image(image_path: PathBuf) -> Result<ImagePrepared> {
     let metadata = get_image_metadata(&image_path)
         .or_else(|_| Err(Error::ImageLoadError(common::get_path(&image_path))))?;
     if metadata.file_size <= IQDB_MAX_SIZE && tuple::lte(metadata.dimensions, IQDB_MAX_DIMENSIONS) {
         return Ok(ImagePrepared::new(image_path));
     }
 
-    let res_dir = tmp_dir::get_tmp_dir(COMPRESSED_TMP_SUBDIR)?;
+    let res_dir = tmp_dir_async::get_tmp_dir(COMPRESSED_TMP_SUBDIR).await?;
 
-    // try compress to QUALITY_IMAGE_HIGH
-    let res = compress_image(&image_path, &res_dir, |w, h, _| {
-        return Factor::new(QUALITY_IMAGE_HIGH, get_scale((w, h)))
-    });
-    if let  Ok(res_image) = res {
-        return Ok(res_image);
-    }
+    task::spawn_blocking(move || {
+        // try compress to QUALITY_IMAGE_HIGH
+        let res = compress_image(&image_path, &res_dir, |w, h, _| {
+            return Factor::new(QUALITY_IMAGE_HIGH, get_scale((w, h)))
+        });
+        if let  Ok(res_image) = res {
+            return Ok(res_image);
+        }
 
-    // try compress to QUALITY_IMAGE_LOW
-    compress_image(&image_path, &res_dir, |w, h, _| {
-        return Factor::new(QUALITY_IMAGE_LOW, get_scale((w, h)))
-    })
+        // try compress to QUALITY_IMAGE_LOW
+        compress_image(&image_path, &res_dir, |w, h, _| {
+            return Factor::new(QUALITY_IMAGE_LOW, get_scale((w, h)))
+        })
+    }).await
+        .or_else(|e| Err(Error::CompressImageError(Some(Box::new(Error::TokioBlockingTask(e))))))?
 }
 
 fn compress_image(image_path: &Path, res_dir: &Path, factor_func: fn(u32, u32, u64) -> Factor) -> Result<ImagePrepared> {
     print!("  (Compressing image ");   // hide the filename that is printed by compress_to_jpg()
     let comp = Compressor::new(image_path, res_dir, factor_func);
     let res_image = comp.compress_to_jpg()
-        .or_else(|_| Err(Error::ImageTooBig(common::get_path(image_path))))?;
+        .or_else(|_| Err(Error::CompressImageError(None)))?;
     println!(")");
     let res_image = ImagePrepared::new_tmp(res_image);
     let res_metadata = get_image_metadata(res_image.get_path())

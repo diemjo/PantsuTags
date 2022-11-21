@@ -1,4 +1,4 @@
-use reqwest::blocking;
+use reqwest::Client;
 use select::document::Document;
 use select::predicate::Attr;
 use enum_iterator::IntoEnumIterator;
@@ -6,12 +6,14 @@ use select::node::Node;
 use crate::common::error::Error;
 use crate::common::pantsu_tag::{PantsuTag, PantsuTagType};
 
-pub fn find_tags_gelbooru(url: &str) -> Result<Vec<PantsuTag>, Error> {
-    let response = blocking::get(url)?;
-    if !response.status().is_success() {
-        return Err(Error::BadResponseStatus(response.status()));
-    }
-    let html = Document::from(response.text()?.as_str());
+use super::net;
+
+pub async fn find_tags_gelbooru(url: &str) -> Result<Vec<PantsuTag>, Error> {
+    let client = Client::new();
+    let resp = client.get(url).send().await?;
+    net::check_status(resp.status())?;
+    let text = resp.text().await?;
+    let html = Document::from(text.as_str());
     extract_tags(&html)
 }
 

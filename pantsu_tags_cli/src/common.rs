@@ -1,6 +1,5 @@
 use std::path::Path;
-use pantsu_tags::{Error, file_handler, SauceMatch};
-use pantsu_tags::ImageHandle;
+use pantsu_tags::{Error, file_handler};
 
 pub type AppResult<T> = std::result::Result<T, AppError>;
 
@@ -29,12 +28,6 @@ pub fn valid_filename_from_path(path: &Path) -> AppResult<String> {
 
 #[derive(Debug, thiserror::Error)]
 pub enum AppError {
-    #[error("Couldn't find relevant sauces")]
-    NoRelevantSauces,
-
-    #[error("Not sure whether sauce is correct or not")]
-    SauceUnsure(ImageHandle, Vec<SauceMatch>),
-
     #[error("Image not found in PantsuTags: {0}")]
     ImageNotFound(String),
 

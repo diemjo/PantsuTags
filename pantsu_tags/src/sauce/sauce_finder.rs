@@ -1,17 +1,16 @@
 use std::path::PathBuf;
 use futures::{stream, StreamExt};
-use reqwest::{blocking, StatusCode};
-use reqwest::blocking::{Client, multipart};
+use reqwest::multipart::Form;
+use reqwest::{blocking, Client};
 use select::document::Document;
 use select::node::Node;
 use select::predicate::{Attr, Name};
 use tokio::io;
-use crate::common;
 use crate::common::tmp_dir::TmpFile;
 use crate::common::tmp_dir_async;
 use crate::common::error::Error;
 use crate::common::error::Result;
-use super::SauceMatch;
+use super::{SauceMatch, net};
 use super::image_preparer;
 
 const IQDB_ADDRESS: &str = "https://gelbooru.iqdb.org/";
@@ -19,18 +18,18 @@ const MAX_CONCURRENT_REQUESTS: usize = 16;
 const THUMBNAIL_TMP_SUBDIR: &str = "thumbnails";
 
 // image path has to point to an image, otherwise returns an Error::HtmlParseError
-pub fn find_sauce(image_path: PathBuf) -> Result<Vec<SauceMatch>> {
-    let image = image_preparer::prepare_image(image_path)?;
+pub async fn find_sauce(image_path: PathBuf) -> Result<Vec<SauceMatch>> {
+    let image = image_preparer::prepare_image(image_path).await?;
     let client = Client::new();
-    let form = multipart::Form::new()
-        .file("file", image.get_path()).or_else(
-        |err| Err(Error::FileNotFound(err, common::get_path(image.get_path()))))?;
+    let image_part = net::create_image_part(image.get_path()).await?;
+    let form = Form::new()
+        .part("file", image_part);
     let response = client.post(IQDB_ADDRESS)
         .multipart(form)
-        .send()?;
-    check_status(response.status())?;
+        .send().await?;
+    net::check_status(response.status())?;
 
-    let response = response.text()?;
+    let response = response.text().await?;
     let html = Document::from(response.as_str());
     extract_sauce(&html)
 }
@@ -38,7 +37,7 @@ pub fn find_sauce(image_path: PathBuf) -> Result<Vec<SauceMatch>> {
 // todo: remove?
 fn get_thumbnail_link(sauce: &SauceMatch) -> Result<String> {
     let response = blocking::get(&sauce.link)?;
-    check_status(response.status())?;
+    net::check_status(response.status())?;
     let html = Document::from(response.text()?.as_str());
     let image = html.find(Attr("id", "image")).next().ok_or(Error::HtmlParseError)?; // thumbnail html element should always exist
     let link = image.attr("src").ok_or(Error::HtmlParseError)?;
@@ -48,10 +47,10 @@ fn get_thumbnail_link(sauce: &SauceMatch) -> Result<String> {
 pub fn get_thumbnails(sauces: &Vec<SauceMatch>) -> Result<Vec<TmpFile>> {
     let rt = tokio::runtime::Runtime::new()
         .or_else(|e| Err(Error::TokioInitError(e)))?;
-    let links = rt.block_on(get_thumbnails_async(sauces))?;
+    let thumbnails = rt.block_on(get_thumbnails_async(sauces))?;
 
     // make sure that the vec of links has the same order as the vec of Sauces
-    Ok(links.into_iter().enumerate()
+    Ok(thumbnails.into_iter().enumerate()
         .map(|(idx,link)| {
             assert!(*link.1 == sauces[idx]);
             link.0
@@ -67,13 +66,13 @@ async fn get_thumbnails_async(sauces: &Vec<SauceMatch>) -> Result<Vec<(TmpFile,&
             let client = &client;
             async move {
                 let resp = client.get(&sauce.link).send().await?;
-                check_status(resp.status())?;
+                net::check_status(resp.status())?;
                 let text = resp.text().await
                     .map_err(|_| Error::FailedThumbnail)?;
                 let link = extract_thumbnail_link(&text)?;
 
                 let resp = client.get(&link).send().await?;
-                check_status(resp.status())?;
+                net::check_status(resp.status())?;
                 let data = resp.bytes().await?;
                 let path = store_thumbnail(&link, data.as_ref()).await?;
                 Ok((path,sauce))
@@ -206,11 +205,4 @@ fn extract_sauce_similarity(sauce_match_tr_element: Node) -> Option<i32> {
     let text = td.text();
     let similarity = text.split('%').collect::<Vec<&str>>()[0];
     similarity.parse::<i32>().ok()
-}
-
-fn check_status(status: StatusCode) -> Result<()> {
-    if !status.is_success() {
-        return Err(Error::BadResponseStatus(status));
-    }
-    Ok(())
 }

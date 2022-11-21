@@ -10,6 +10,9 @@ pub enum Error {
     #[error("Failed to send image source request: {0}")]
     FailedRequest(#[from] reqwest::Error),
 
+    #[error("Unable to create network request")]
+    FailedRequestCreation,
+
     #[error("Failed to get thumbnail")]
     FailedThumbnail,
 
@@ -21,6 +24,9 @@ pub enum Error {
 
     #[error("Sauce value is not a valid URL: {0}")]
     InvalidSauce(String),
+    
+    #[error("Failed to compress image")]
+    CompressImageError(#[source] Option<Box<Error>>),
 
     // pantsu tag database errors
     #[error("Primary key constraint error: {0}")]
@@ -81,6 +87,10 @@ pub enum Error {
     #[error("'{0}' is not formatted correctly as an import file")]
     InvalidImportFileFormat(String, Option<Box<Error>>),
 
+    // tokio errors
     #[error("Failed to initialize tokio runtime ({0})")]
-    TokioInitError(#[source] std::io::Error)
+    TokioInitError(#[source] std::io::Error),
+
+    #[error("Tokio blocking task failed to execute to completion")]
+    TokioBlockingTask(#[source] tokio::task::JoinError),
 }
