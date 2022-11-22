@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::Path;
 use futures::{stream, StreamExt};
 use reqwest::multipart::Form;
 use reqwest::Client;
@@ -6,6 +6,7 @@ use select::document::Document;
 use select::node::Node;
 use select::predicate::{Attr, Name};
 use tokio::io;
+use crate::ImageHandle;
 use crate::common::tmp_dir::TmpFile;
 use crate::common::tmp_dir_async;
 use crate::common::error::Error;
@@ -18,8 +19,8 @@ const MAX_CONCURRENT_REQUESTS: usize = 16;
 const THUMBNAIL_TMP_SUBDIR: &str = "thumbnails";
 
 // image path has to point to an image, otherwise returns an Error::HtmlParseError
-pub async fn find_sauce(image_path: PathBuf) -> Result<Vec<SauceMatch>> {
-    let image = image_preparer::prepare_image(image_path).await?;
+pub async fn find_sauce(image_handle: &ImageHandle, lib_path: &Path) -> Result<Vec<SauceMatch>> {
+    let image = image_preparer::prepare_image(image_handle, lib_path).await?;
     let client = Client::new();
     let image_part = net::create_image_part(image.get_path()).await?;
     let form = Form::new()

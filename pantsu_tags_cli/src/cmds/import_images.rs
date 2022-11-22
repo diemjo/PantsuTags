@@ -136,17 +136,22 @@ fn feh_display_similar(similar_images: &SimilarImagesGroup, use_feh: bool) -> Fe
         return feh_proc;
     }
 
-    let new_image_names: Vec<String> = similar_images.new_images.iter().map(|img| common::get_path(&img.current_path)).collect();
-    feh_proc = feh::feh_display_images(new_image_names.iter().map(|img_name| img_name.as_str()),
-                            "New image", feh_proc);
+    let new_image_names: AppResult<Vec<String>> = similar_images.new_images.iter()
+        .map(|img| common::try_get_path(&img.current_path)).collect();
+    match new_image_names {
+        Ok(new_image_names) => feh_proc = feh::feh_display_images(new_image_names.iter().map(|img_name| img_name.as_str()), "New image", feh_proc),
+        Err(_) => return feh_proc,
+    }
 
     if !similar_images.old_images.is_empty() {
         let lib_path = CONFIGURATION.library_path.as_path();
         // store as vector since we need to pass a &str iterator to feh_display_images()
-        let old_images: Vec<String> = similar_images.old_images.iter()
-            .map(|img| img.get_path(lib_path)).collect();
-        feh_proc = feh::feh_display_images(old_images.iter().map(|img| img.as_str()),
-                                "Image already stored in PantsuTags", feh_proc)
+        let res_old_images: AppResult<Vec<String>> = similar_images.old_images.iter()
+            .map(|img| common::try_get_path(&img.get_path(lib_path))).collect();
+        if let Ok(old_images) = res_old_images {
+            feh_proc = feh::feh_display_images(old_images.iter().map(|img| img.as_str()),
+                                            "Image already stored in PantsuTags", feh_proc);
+        }
     }
     feh_proc
 }

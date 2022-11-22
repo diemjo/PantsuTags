@@ -7,6 +7,11 @@ pub fn get_path(path: &Path) -> String {
     String::from(path.to_str().unwrap_or("cannot display path"))
 }
 
+pub fn try_get_path(path: &Path) -> AppResult<String> {
+    let path_str = path.to_str().ok_or(AppError::PathConversionError)?;
+    Ok(String::from(path_str))
+}
+
 pub fn get_filename(path: &Path) -> AppResult<String> {
     match path.file_name() {
         Some(name) => match name.to_str() {
@@ -39,4 +44,7 @@ pub enum AppError {
 
     #[error("Failed to load config")]
     ConfigError(#[from] figment::Error),
+
+    #[error("Invalid path: unable to convert path to string")]
+    PathConversionError,
 }

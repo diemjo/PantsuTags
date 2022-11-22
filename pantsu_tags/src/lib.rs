@@ -40,9 +40,7 @@ pub fn import_image(pantsu_db: &mut PantsuDB, lib: &Path, image: &ImageToImport,
 
 
 pub async fn get_image_sauces(lib: &Path, image: &ImageHandle) -> Result<Vec<SauceMatch>> {
-    let mut image_path = PathBuf::from(lib);
-    image_path.push(image.get_filename());
-    let mut sauce_matches = sauce::find_sauce(image_path).await?;
+    let mut sauce_matches = sauce::find_sauce(image, lib).await?;
     sauce_matches.sort();
     sauce_matches.reverse();
     Ok(sauce_matches)

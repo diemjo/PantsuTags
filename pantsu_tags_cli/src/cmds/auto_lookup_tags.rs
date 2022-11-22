@@ -1,13 +1,13 @@
 use std::collections::HashSet;
 use std::{io, iter};
-use std::path::PathBuf;
+use std::path::{PathBuf, Path};
 use colored::Colorize;
 use futures::{stream, StreamExt, TryStreamExt};
 use log::{info, warn};
 use pantsu_tags::{ImageHandle, PantsuTag, Sauce, SauceMatch, TmpFile};
 use pantsu_tags::db::PantsuDB;
 use tokio::runtime::Runtime;
-use crate::{AppError, CONFIGURATION, feh};
+use crate::{AppError, CONFIGURATION, feh, common};
 use crate::common::{AppResult, valid_filename_from_path};
 use crate::feh::FehProcesses;
 
@@ -120,7 +120,7 @@ fn resolve_sauce_unsure(pdb: &mut PantsuDB, rt: Runtime, images_to_resolve: Vec<
     for (image_idx, image) in images_to_resolve.iter().enumerate() {
         let image_path = image.image_handle.get_path(lib_path);
         let mut thumbnails = ThumbnailDisplayer::new(use_feh);
-        println!("\nImage {} of {}:\n{}\n", image_idx+1, images_to_resolve.len(), image_path);
+        println!("\nImage {} of {}:\n{}\n", image_idx+1, images_to_resolve.len(), common::get_path(&image_path));
         thumbnails.set_thumbnails(&image.matches);
         thumbnails.feh_display(&image_path);
         for (index, sauce) in image.matches.iter().enumerate() {
@@ -243,10 +243,18 @@ impl ThumbnailDisplayer {
         }
     }
 
-    fn feh_display(&mut self, image_path: &str) {
+    fn feh_display(&mut self, image_path: &Path) {
         if !self.enabled {
             return;
         }
+        let image_path_str = match common::try_get_path(image_path) {
+            Ok(path) => path,
+            Err(_) => {
+                self.enabled = false;
+                return;
+            },
+        };
+
         let paths = self.thumbnails.iter()
             .map(|p| p.get_path().to_str())
             .collect::<Option<Vec<&str>>>();
@@ -255,7 +263,7 @@ impl ThumbnailDisplayer {
             None => return,
         };
         let mut procs = self.feh_processes.take().unwrap_or(FehProcesses::new_empty());
-        procs = feh::feh_display_images(iter::once(image_path), "Local image", procs);
+        procs = feh::feh_display_images(iter::once(image_path_str.as_str()), "Local image", procs);
         self.feh_processes = Some(feh::feh_display_images(paths.into_iter(), "Potential source", procs));
     }
 

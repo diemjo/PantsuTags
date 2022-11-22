@@ -5,11 +5,11 @@ use std::path::{Path, PathBuf};
 use image::GenericImageView;
 use image_compressor::Factor;
 use image_compressor::compressor::Compressor;
-use log::warn;
+use log::{warn, info};
 use tokio::task;
 use crate::common::tmp_dir::TmpFile;
 use crate::common::tmp_dir_async;
-use crate::{Error, Result, common};
+use crate::{Error, Result, common, ImageHandle};
 
 const COMPRESSED_TMP_SUBDIR: &str = "compressed-images";
 const IQDB_MAX_SIZE: u64 = 1<<23;
@@ -50,13 +50,15 @@ impl ImagePrepared {
     }
 }
 
-pub async fn prepare_image(image_path: PathBuf) -> Result<ImagePrepared> {
+pub async fn prepare_image(image_handle: &ImageHandle, lib: &Path) -> Result<ImagePrepared> {
+    let image_path = image_handle.get_path(lib);
     let metadata = get_image_metadata(&image_path)
         .or_else(|_| Err(Error::ImageLoadError(common::get_path(&image_path))))?;
     if metadata.file_size <= IQDB_MAX_SIZE && tuple::lte(metadata.dimensions, IQDB_MAX_DIMENSIONS) {
         return Ok(ImagePrepared::new(image_path));
     }
 
+    info!("Image too large, will compress it: {}", image_handle.get_filename());
     let res_dir = tmp_dir_async::get_tmp_dir(COMPRESSED_TMP_SUBDIR).await?;
 
     task::spawn_blocking(move || {
