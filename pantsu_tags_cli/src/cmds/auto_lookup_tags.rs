@@ -236,10 +236,7 @@ impl ThumbnailDisplayer {
         }
         match pantsu_tags::get_thumbnails(&sauces) {
             Ok(paths) => self.thumbnails = paths,
-            Err(_) => {
-                // todo: log warning?
-                self.enabled = false;
-            }
+            Err(_) => self.disable("Unable to download source thumbnails"),
         }
     }
 
@@ -249,10 +246,7 @@ impl ThumbnailDisplayer {
         }
         let image_path_str = match common::try_get_path(image_path) {
             Ok(path) => path,
-            Err(_) => {
-                self.enabled = false;
-                return;
-            },
+            Err(_) => { self.disable("Image path is invalid"); return; },
         };
 
         let paths = self.thumbnails.iter()
@@ -260,11 +254,16 @@ impl ThumbnailDisplayer {
             .collect::<Option<Vec<&str>>>();
         let paths = match paths {
             Some(p) => p,
-            None => return,
+            None => { self.disable("Source thumbnail path is invalid"); return; },
         };
         let mut procs = self.feh_processes.take().unwrap_or(FehProcesses::new_empty());
         procs = feh::feh_display_images(iter::once(image_path_str.as_str()), "Local image", procs);
         self.feh_processes = Some(feh::feh_display_images(paths.into_iter(), "Potential source", procs));
+    }
+
+    fn disable(&mut self, msg: &str) {
+        self.enabled = false;
+        warn!("Disable feh: {}", msg);
     }
 
     fn kill_feh(&mut self) {
