@@ -105,7 +105,7 @@ fn resolve_similar_image_groups(pdb: &mut PantsuDB, similar_images_groups: Vec<S
                         if numbers.iter().any(|&num| idx == num-1) {
                             pantsu_tags::import_image(pdb, CONFIGURATION.library_path.as_path(), new_image, always_copy_images)?;
                             stats.similar_imported += 1;
-                            println!("Imported new image {}: {}", idx, image_name);
+                            println!("Imported new image {}: {}", idx+1, image_name);
                             info!("Imported similar image: '{}'", image_name);
                         }
                         else {
