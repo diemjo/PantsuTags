@@ -70,7 +70,7 @@ pub struct SauceMatch {
 impl Ord for SauceMatch {
     fn cmp(&self, other: &Self) -> Ordering {
         match self.similarity.cmp(&other.similarity) {
-            Ordering::Equal => self.resolution.cmp(&other.resolution),
+            Ordering::Equal => (self.resolution.0 * self.resolution.1).cmp(&(other.resolution.0 * other.resolution.1)),
             other => other,
         }
     }
