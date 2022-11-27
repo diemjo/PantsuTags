@@ -6,7 +6,8 @@ use futures::{stream, StreamExt, TryStreamExt};
 use log::{info, warn};
 use pantsu_tags::{ImageHandle, PantsuTag, Sauce, SauceMatch, TmpFile};
 use pantsu_tags::db::PantsuDB;
-use tokio::runtime::Runtime;
+use tokio::sync::mpsc::{Receiver, self};
+use tokio::task;
 use crate::{AppError, CONFIGURATION, feh, common};
 use crate::common::{AppResult, valid_filename_from_path};
 use crate::feh::FehProcesses;
@@ -17,6 +18,7 @@ const FOUND_SIMILARITY_THRESHOLD: i32 = 90;
 const RELEVANT_SIMILARITY_THESHOLD: i32 = 45;
 
 const MAX_CONCURRENT_REQUESTS: usize = 16;
+const MAX_PREFETCH_SOURCE_RESOLUTION: usize = 4;
 
 pub fn auto_lookup_tags(image_paths: Vec<PathBuf>, sauce_existing: bool, sauce_not_existing: bool, sauce_not_checked: bool, no_feh: bool) -> AppResult<()> {
     let pdb = PantsuDB::new(CONFIGURATION.database_path.as_path())?;
@@ -24,9 +26,9 @@ pub fn auto_lookup_tags(image_paths: Vec<PathBuf>, sauce_existing: bool, sauce_n
     
     let rt = tokio::runtime::Runtime::new()
         .or_else(|e| Err(pantsu_tags::Error::TokioInitError(e)))?;
-    let (mut pdb, mut stats, unsure_source_images) = rt.block_on(auto_lookup_tags_async(pdb, images))?;
+    let (pdb, stats, unsure_source_images) = rt.block_on(auto_lookup_tags_async(pdb, images))?;
 
-    resolve_sauce_unsure(&mut pdb, rt, unsure_source_images, &mut stats, no_feh)?;
+    let stats = rt.block_on(resolve_sauce_unsure(pdb, unsure_source_images, stats, no_feh))?;
     println!();
     stats.print_stats();
     Ok(())
@@ -108,21 +110,52 @@ async fn store_sauce_in_db(pdb: &mut PantsuDB, image: &ImageHandle, sauce_judgem
 }
 
 
-fn resolve_sauce_unsure(pdb: &mut PantsuDB, rt: Runtime, images_to_resolve: Vec<SauceUnsure>, stats: &mut AutoTaggingStats, no_feh: bool) -> AppResult<()>{
+async fn resolve_sauce_unsure(pdb: PantsuDB, images_to_resolve: Vec<SauceUnsure>, stats: AutoTaggingStats, no_feh: bool) -> AppResult<AutoTaggingStats> {
     if images_to_resolve.is_empty() {
-        return Ok(());
+        return Ok(stats);
     }
     let use_feh = !no_feh && feh::feh_available();
+    let num_images_to_resolve = images_to_resolve.len();
+    let (tx,rx) = mpsc::channel(1);
+    let resolver_thread = task::spawn_blocking(move || { resolve_sauce_thread(pdb, rx, num_images_to_resolve, stats, use_feh)} );
+
+    println!("\n\nResolving {} images with unsure sources manually:", num_images_to_resolve);
+    let _ = stream::iter(images_to_resolve)
+        .map(|image| {
+            let tx = tx.clone();
+            async move {
+                let thumbnails = pantsu_tags::get_thumbnails(&image.matches).await;
+                tx.send((image, thumbnails)).await
+                    .or(Err(AppError::TaskCommunicationError))
+            }
+        })
+        .buffer_unordered(MAX_PREFETCH_SOURCE_RESOLUTION)
+        .try_for_each(|_| async move { Ok(()) }).await;
+
+    drop(tx);
+    let stats = resolver_thread.await??;
+
+    Ok(stats)
+}
+
+type ResolveRequest = (SauceUnsure, pantsu_tags::Result<Vec<TmpFile>>);
+
+fn resolve_sauce_thread(mut pdb: PantsuDB, mut rx: Receiver<ResolveRequest>, num_images_to_resolve: usize, mut stats: AutoTaggingStats, use_feh: bool) -> AppResult<AutoTaggingStats> {
+    let rt = tokio::runtime::Runtime::new()
+        .or_else(|e| Err(pantsu_tags::Error::TokioInitError(e)))?;
+    let mut thumb_displayer = ThumbnailDisplayer::new(use_feh);
     let mut input = String::new();
     let stdin = io::stdin();
     let lib_path = CONFIGURATION.library_path.as_path();
-    println!("\n\nResolving {} images with unsure sources manually:", images_to_resolve.len());
-    for (image_idx, image) in images_to_resolve.iter().enumerate() {
+    let mut image_idx = 0;
+
+    while let Some((image, thumbnails)) = rx.blocking_recv() {
         let image_path = image.image_handle.get_path(lib_path);
-        let mut thumbnails = ThumbnailDisplayer::new(use_feh);
-        println!("\nImage {} of {}:\n{}\n", image_idx+1, images_to_resolve.len(), common::get_path(&image_path));
-        thumbnails.set_thumbnails(&image.matches);
-        thumbnails.feh_display(&image_path);
+        assert!(image_idx < num_images_to_resolve);
+        image_idx += 1;
+        println!("\nImage {} of {}:\n{}\n", image_idx, num_images_to_resolve, common::get_path(&image_path));
+        thumb_displayer.set_thumbnails(thumbnails);
+        thumb_displayer.feh_display(&image_path);
         for (index, sauce) in image.matches.iter().enumerate() {
             println!("{} - {}", index+1, sauce.link);
         }
@@ -161,14 +194,17 @@ fn resolve_sauce_unsure(pdb: &mut PantsuDB, rt: Runtime, images_to_resolve: Vec<
             }
             else if input.eq("s") {
                 println!("Skip remaining images");
-                thumbnails.kill_feh();
-                return Ok(());
+                thumb_displayer.kill_feh();
+
+                // todo: adjust stats (include skipped images)
+                return Ok(stats);
             }
             println!("Invalid input");
         }
-        thumbnails.kill_feh();
+        thumb_displayer.kill_feh();
     }
-    Ok(())
+
+    Ok(stats)
 }
 
 fn get_images(pdb: &PantsuDB, image_paths: &Vec<PathBuf>, sauce_existing: bool, sauce_not_existing: bool, sauce_not_checked: bool) -> AppResult<HashSet<ImageHandle>> {
@@ -230,11 +266,11 @@ impl ThumbnailDisplayer {
         }
     }
 
-    fn set_thumbnails(&mut self, sauces: &Vec<SauceMatch>) {
+    fn set_thumbnails(&mut self, thumbnails: pantsu_tags::Result<Vec<TmpFile>>) {
         if !self.enabled {
             return;
         }
-        match pantsu_tags::get_thumbnails(&sauces) {
+        match thumbnails {
             Ok(paths) => self.thumbnails = paths,
             Err(_) => self.disable("Unable to download source thumbnails"),
         }

@@ -1,5 +1,6 @@
 use std::path::Path;
 use pantsu_tags::{Error, file_handler};
+use tokio::task::JoinError;
 
 pub type AppResult<T> = std::result::Result<T, AppError>;
 
@@ -47,4 +48,10 @@ pub enum AppError {
 
     #[error("Invalid path: unable to convert path to string")]
     PathConversionError,
+
+    #[error("Faild to join with task")]
+    TaskJoinError(#[from] JoinError),
+
+    #[error("Failed to communicate with task")]
+    TaskCommunicationError,
 }

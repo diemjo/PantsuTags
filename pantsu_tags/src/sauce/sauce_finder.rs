@@ -35,24 +35,10 @@ pub async fn find_sauce(image_handle: &ImageHandle, lib_path: &Path) -> Result<V
     extract_sauce(&html)
 }
 
-pub fn get_thumbnails(sauces: &Vec<SauceMatch>) -> Result<Vec<TmpFile>> {
-    let rt = tokio::runtime::Runtime::new()
-        .or_else(|e| Err(Error::TokioInitError(e)))?;
-    let thumbnails = rt.block_on(get_thumbnails_async(sauces))?;
-
-    // make sure that the vec of links has the same order as the vec of Sauces
-    Ok(thumbnails.into_iter().enumerate()
-        .map(|(idx,link)| {
-            assert!(*link.1 == sauces[idx]);
-            link.0
-        }
-    ).collect())
-}
-
 // explanation: https://stackoverflow.com/a/51047786
-async fn get_thumbnails_async(sauces: &Vec<SauceMatch>) -> Result<Vec<(TmpFile,&SauceMatch)>> {
+pub async fn get_thumbnails(sauces: &Vec<SauceMatch>) -> Result<Vec<TmpFile>> {
     let client = reqwest::Client::new();
-    let links = stream::iter(sauces)
+    let thumbnails = stream::iter(sauces)
         .map(|sauce| {
             let client = &client;
             async move {
@@ -72,7 +58,13 @@ async fn get_thumbnails_async(sauces: &Vec<SauceMatch>) -> Result<Vec<(TmpFile,&
         .buffered(MAX_CONCURRENT_REQUESTS)
         .collect::<Vec<Result<(TmpFile,&SauceMatch)>>>().await;
 
-    links.into_iter().collect::<Result<Vec<(TmpFile,&SauceMatch)>>>()
+    let thumbnails = thumbnails.into_iter().collect::<Result<Vec<(TmpFile,&SauceMatch)>>>()?;
+    // make sure that the vec of links has the same order as the vec of Sauces
+    Ok(thumbnails.into_iter().enumerate()
+        .map(|(idx,(path,sauce))| {
+            assert!(*sauce == sauces[idx]);
+            path
+        }).collect())
 }
 
 // Extract thumbnail from Gelbooru page
