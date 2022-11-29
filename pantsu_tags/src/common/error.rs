@@ -1,4 +1,5 @@
 use std::{path::{PathBuf}};
+use chrono::ParseError;
 use reqwest::StatusCode;
 use crate::ImageHandle;
 
@@ -38,11 +39,17 @@ pub enum Error {
     #[error("Failed underlying SQLite call: {0}")]
     SQLError(#[from] rusqlite::Error),
 
-    #[error("Cannot convert invalid tag type '{0}' to enum variant of PantsuTagType, valid types:\nartist, source, character, general, rating, custom")]
+    #[error("Cannot convert invalid tag type '{0}' to enum variant of PantsuTagType, valid types: artist, source, character, general, rating, custom")]
     InvalidTagType(String),
+
+    #[error("Cannot convert invalid tag author '{0}' to enum variant of PantsuTagAuthor, valid types: gelbooru, user")]
+    InvalidTagAuthor(String),
 
     #[error("Cannot convert tag string '{0}' to PantsuTag, valid format: <type>:<name>")]
     InvalidTagFormat(String),
+
+    #[error("Invalid NaiveDateTime format: {0}")]
+    InvalidDateFormat(#[source] ParseError),
 
     #[error("Similar images to '{0}' already exist in database: '{1:?}'")]
     SimilarImagesExist(PathBuf, Vec<ImageHandle>), // Path is the path to the new images before inserting it in the db
@@ -89,6 +96,12 @@ pub enum Error {
 
     #[error("'{0}' is not formatted correctly as an import file")]
     InvalidImportFileFormat(String, Option<Box<Error>>),
+
+    #[error("Import file '{0}' version differs from local database version: theirs={2}, ours={1}")]
+    DatabaseVersionMismatch(String, usize, usize),
+
+    #[error("Import file line '{0}' is not formatted correctly")]
+    InvalidImportFileLineFormat(String),
 
     // tokio errors
     #[error("Failed to initialize tokio runtime ({0})")]

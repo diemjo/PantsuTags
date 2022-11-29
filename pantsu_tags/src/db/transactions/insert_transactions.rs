@@ -1,11 +1,11 @@
 use rusqlite::Connection;
 use crate::db::db_calls;
-use crate::{file_handler, ImageHandle};
-use crate::error::{Result, Error};
+use crate::{ImageHandle};
+use crate::error::{Result};
 
 pub struct InsertImagesTransaction<'a> {
     connection: &'a mut Connection,
-    images: Vec<&'a ImageHandle>,
+    images: Vec<(&'a ImageHandle, (u32, u32))>,
 }
 
 impl<'a> InsertImagesTransaction<'a> {
@@ -16,26 +16,19 @@ impl<'a> InsertImagesTransaction<'a> {
         }
     }
 
-    pub fn add_image(mut self, image: &'a ImageHandle) -> Self {
-        self.images.push(image);
+    pub fn add_image(mut self, image: &'a ImageHandle, res: (u32, u32)) -> Self {
+        self.images.push((image, res));
         self
     }
 
-    pub fn add_images(mut self, images: &'a Vec<ImageHandle>) -> Self {
-        self.images.extend(images);
-        self
-    }
-
-//impl<'a> PantsuTransaction<()> for InsertImagesTransaction<'a> {
-    pub fn execute(self) -> Result<()> {
+    pub fn execute(self) -> Result<u32> {
         let transaction = self.connection.transaction()?;
-        for image in self.images {
-            if !file_handler::filename_is_valid(image.get_filename()) {
-                return Err(Error::InvalidFilename(String::from(image.get_filename())))
-            }
-            db_calls::add_file_to_file_list(&transaction, &image)?;
+        let mut count = 0;
+        for (image, res) in self.images {
+            db_calls::add_image_to_images(&transaction, &image, res)?;
+            count += 1;
         }
         transaction.commit()?;
-        Ok(())
+        Ok(count)
     }
 }

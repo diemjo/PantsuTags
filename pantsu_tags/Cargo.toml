@@ -6,7 +6,7 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-rusqlite = "0.26.1"
+rusqlite = { version = "0.26.1", features = [] }
 reqwest = { version = "0.11", features = ["blocking", "multipart"] }
 tokio = { version = "1.21.2", features = ["fs", "macros"] }
 futures = "0.3.25"
@@ -21,6 +21,7 @@ blockhash = "0.3.0"
 regex = "1.5.4"
 mime_guess = "2.0.4"
 log = "0.4.17"
+chrono = "0.4.23"
 
 [dev-dependencies]
 serial_test = "0.5.1"

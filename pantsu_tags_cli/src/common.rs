@@ -1,5 +1,5 @@
 use std::path::Path;
-use pantsu_tags::{Error, file_handler};
+use pantsu_tags::{Error, ImageHandle};
 use tokio::task::JoinError;
 
 pub type AppResult<T> = std::result::Result<T, AppError>;
@@ -23,13 +23,10 @@ pub fn get_filename(path: &Path) -> AppResult<String> {
     }
 }
 
-pub fn valid_filename_from_path(path: &Path) -> AppResult<String> {
+pub fn image_handle_from_path(path: &Path) -> AppResult<ImageHandle> {
     let filename = get_filename(path)?;
-    if !file_handler::filename_is_valid(filename.as_str()) {
-        Err(Error::InvalidFilename(filename))?
-    } else {
-        Ok(filename)
-    }
+    let image_handle = ImageHandle::new(filename)?;
+    Ok(image_handle)
 }
 
 #[derive(Debug, thiserror::Error)]

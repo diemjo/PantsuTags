@@ -2,8 +2,8 @@ use std::path::{Path, PathBuf};
 use rusqlite::{Connection};
 
 use crate::common::error::Result;
-use crate::{common, Error};
-use crate::db::transactions::{DeleteImagesTransaction, InsertImagesTransaction, SelectImagesTransaction, SelectImageTransaction, SelectTagsTransaction, UpdateImagesTransaction};
+use crate::{common, Error, ImageHandle};
+use crate::db::transactions::{DeleteImagesTransaction, InsertImagesTransaction, SelectImagesTransaction, SelectImageTransaction, SelectTagsTransaction, SelectImageTagsTransaction, UpdateImagesTransaction};
 
 mod db_calls;
 mod sqlite_statements;
@@ -49,12 +49,16 @@ impl PantsuDB {
         Ok(PantsuDB { conn })
     }
 
+    pub fn get_db_version(&self) -> Result<usize> {
+        db_calls::db_version(&self.conn)
+    }
+
     // WARNING: ALL DATA WILL BE LOST
     pub fn clear(&mut self) -> Result<()> {
         let transaction = self.conn.transaction()?;
 
-        db_calls::clear_all_file_tags(&transaction)?;
-        db_calls::clear_all_files(&transaction)?;
+        db_calls::clear_all_image_tags(&transaction)?;
+        db_calls::clear_all_images(&transaction)?;
         db_calls::clear_all_tags(&transaction)?;
 
         transaction.commit()?;
@@ -62,8 +66,8 @@ impl PantsuDB {
     }
 
     // select
-    pub fn get_image_transaction<'a>(&'a self, filename: &'a str) -> SelectImageTransaction<'a> {
-        SelectImageTransaction::new(&self.conn, filename)
+    pub fn get_image_transaction<'a>(&'a self, image: &'a ImageHandle) -> SelectImageTransaction<'a> {
+        SelectImageTransaction::new(&self.conn, image)
     }
 
     pub fn get_images_transaction<'a>(&'a self) -> SelectImagesTransaction<'a> {
@@ -72,6 +76,10 @@ impl PantsuDB {
 
     pub fn get_tags_transaction<'a>(&'a self) -> SelectTagsTransaction<'a> {
         SelectTagsTransaction::new(&self.conn)
+    }
+
+    pub fn get_image_tags_transaction<'a>(&'a self, image: &'a ImageHandle) -> SelectImageTagsTransaction<'a> {
+        SelectImageTagsTransaction::new(&self.conn, image)
     }
 
     pub fn update_images_transaction<'a>(&'a mut self) -> UpdateImagesTransaction<'a> {
@@ -113,14 +121,8 @@ mod tests {
         let mut pdb = get_pantsu_db(Some(std::env::current_dir().unwrap().as_path())).unwrap();
         pdb.clear().unwrap();
         add_test_image(&mut pdb).unwrap();
-        assert!(
-            matches!(pdb.add_images_transaction()
-                .add_image(&get_test_image())
-                .execute()
-                .unwrap_err(),
-                Error::SQLPrimaryKeyError{..}
-            )
-        );
+        let res = add_test_image(&mut pdb).unwrap_err();
+        assert!( matches!(res, Error::SQLPrimaryKeyError{..}) );
     }
 
     #[test]
@@ -131,11 +133,11 @@ mod tests {
         let img = &get_test_image();
         add_test_image(&mut pdb).unwrap();
         pdb.update_images_transaction()
-            .for_image(get_test_image().get_filename())
+            .for_image(&img)
             .update_sauce(&Sauce::Match(sauce::url_from_str("https://fake.url").unwrap()))
             .execute()
             .unwrap();
-        assert_eq!(pdb.get_image_transaction(img.get_filename())
+        assert_eq!(pdb.get_image_transaction(img)
                        .execute()
                        .unwrap()
                        .unwrap()
@@ -150,8 +152,9 @@ mod tests {
         let mut pdb = get_pantsu_db(Some(std::env::current_dir().unwrap().as_path())).unwrap();
         pdb.clear().unwrap();
         add_test_image(&mut pdb).unwrap();
+        let img2 = get_test_image2();
         pdb.update_images_transaction()
-            .for_image(&get_test_image2().get_filename())
+            .for_image(&img2)
             .add_tags(&vec![
                 "general:Haha".parse().unwrap(),
                 "artist:Hehe".parse().unwrap(),
@@ -170,8 +173,9 @@ mod tests {
         pdb.clear().unwrap();
         add_test_image(&mut pdb).unwrap();
         add_test_image2(&mut pdb).unwrap();
+        let img = get_test_image();
         pdb.update_images_transaction()
-            .for_image(&get_test_image().get_filename())
+            .for_image(&img)
             .add_tags(&vec![
                 "general:Haha".parse().unwrap(),
                 "artist:Hehe".parse().unwrap(),
@@ -180,7 +184,7 @@ mod tests {
             .execute()
             .unwrap();
         let files1 = pdb.get_images_transaction().execute().unwrap();
-        pdb.remove_image_transaction().remove_image(get_test_image().get_filename()).execute().unwrap();
+        pdb.remove_image_transaction().remove_image(&img).execute().unwrap();
         let files2 = pdb.get_images_transaction().execute().unwrap();
         assert_eq!(2, files1.len());
         assert_eq!(1, files2.len());
@@ -193,8 +197,9 @@ mod tests {
         let mut pdb = get_pantsu_db(Some(std::env::current_dir().unwrap().as_path())).unwrap();
         pdb.clear().unwrap();
         add_test_image(&mut pdb).unwrap();
+        let img = get_test_image();
         pdb.update_images_transaction()
-            .for_image(&get_test_image().get_filename())
+            .for_image(&img)
             .add_tags(&vec![
                 "general:Haha".parse().unwrap(),
                 "artist:Hehe".parse().unwrap(),
@@ -203,16 +208,20 @@ mod tests {
             .execute()
             .unwrap();
         pdb.update_images_transaction()
-            .for_image(get_test_image().get_filename())
+            .for_image(&img)
             .remove_tags(
-                &vec!["Haha".to_string()]
+                &vec!["general:Haha".parse().unwrap()]
             ).execute()
             .unwrap();
-        let tags = pdb.get_tags_transaction()
-            .for_image(get_test_image().get_filename())
+        let tags = pdb.get_image_tags_transaction(&img)
             .execute()
-            .unwrap();
-        assert_eq!(&tags, &vec!["artist:Hehe".parse().unwrap(), "character:Hihi".parse().unwrap()]);
+            .unwrap()
+            .into_iter()
+            .map(|t| t.tag)
+            .collect::<Vec<_>>();
+        assert_eq!(HashSet::<&PantsuTag>::from_iter(&tags),
+                   HashSet::<&PantsuTag>::from_iter(&vec!["artist:Hehe".parse().unwrap(), "character:Hihi".parse().unwrap()])
+                );
     }
 
     #[test]
@@ -222,8 +231,10 @@ mod tests {
         pdb.clear().unwrap();
         add_test_image(&mut pdb).unwrap();
         add_test_image2(&mut pdb).unwrap();
+        let img = get_test_image();
+        let img2 = get_test_image2();
         pdb.update_images_transaction()
-            .for_image(get_test_image().get_filename())
+            .for_image(&img)
             .add_tags(&vec![
                 "general:Haha".parse().unwrap(),
                 "artist:Hehe".parse().unwrap(),
@@ -232,7 +243,7 @@ mod tests {
             .execute()
             .unwrap();
         pdb.update_images_transaction()
-            .for_image(get_test_image2().get_filename())
+            .for_image(&img2)
             .add_tags(&vec![
                 "general:Haha".parse().unwrap(),
                 "artist:Huhu".parse().unwrap(),
@@ -240,10 +251,12 @@ mod tests {
             ])
             .execute()
             .unwrap();
-        let tags = pdb.get_tags_transaction()
-            .for_image(get_test_image2().get_filename())
+        let tags = pdb.get_image_tags_transaction(&img2)
             .execute()
-            .unwrap();
+            .unwrap()
+            .into_iter()
+            .map(|t| t.tag)
+            .collect::<Vec<_>>();
         assert_eq!(HashSet::<PantsuTag>::from_iter(tags),
                    HashSet::<PantsuTag>::from_iter(vec!["general:Haha".parse().unwrap(), "artist:Huhu".parse().unwrap(), "character:Höhö".parse().unwrap()])
         );
@@ -260,16 +273,35 @@ mod tests {
             "character:Hihi".parse().unwrap(),
         ];
         add_test_image(&mut pdb).unwrap();
+        let img = get_test_image();
         pdb.update_images_transaction()
-            .for_image(get_test_image().get_filename())
+            .for_image(&img)
             .add_tags(&tags_to_add)
+            .execute()
+            .unwrap();
+        let tags_to_add2 = vec![
+            "general:Haha".parse().unwrap(),
+            "artist:Hehe".parse().unwrap(),
+            "rating:Huhu".parse().unwrap(),
+        ];
+        add_test_image2(&mut pdb).unwrap();
+        let img2 = get_test_image2();
+        pdb.update_images_transaction()
+            .for_image(&img2)
+            .add_tags(&tags_to_add2)
             .execute()
             .unwrap();
         let all_tags = pdb.get_tags_transaction()
             .execute()
             .unwrap();
         assert_eq!(HashSet::<PantsuTag>::from_iter(all_tags),
-                   HashSet::<PantsuTag>::from_iter(tags_to_add));
+                   HashSet::<PantsuTag>::from_iter(vec![
+                    "general:Haha".parse().unwrap(),
+                    "artist:Hehe".parse().unwrap(),
+                    "character:Hihi".parse().unwrap(),
+                    "rating:Huhu".parse().unwrap(),
+                    ])
+        );
     }
 
     #[test]
@@ -283,42 +315,45 @@ mod tests {
             "character:Hihi".parse().unwrap(),
         ];
         add_test_image(&mut pdb).unwrap();
+        let img = get_test_image();
         pdb.update_images_transaction()
-            .for_image(get_test_image().get_filename())
+            .for_image(&img)
             .add_tags(&tags_to_add)
             .execute()
-            .unwrap();        add_test_image2(&mut pdb).unwrap();
+            .unwrap();
+        add_test_image2(&mut pdb).unwrap();
+        let img2 = get_test_image2();
         pdb.update_images_transaction()
-            .for_image(get_test_image2().get_filename())
+            .for_image(&img2)
             .add_tags(&tags_to_add)
             .execute()
             .unwrap();
         pdb.update_images_transaction()
-            .for_image(get_test_image2().get_filename())
+            .for_image(&img2)
             .add_tags(&vec!["general:Huhu".parse().unwrap()])
             .execute()
             .unwrap();
         let files = pdb.get_images_transaction()
-            .including_tag("Haha")
+            .including_tag(&"general:Haha".parse().unwrap())
             .execute()
             .unwrap();
-        assert_eq!(files, vec![get_test_image(), get_test_image2()]);
+        assert_eq!(files.iter().map(|i| i.get_image()).collect::<Vec<&ImageHandle>>(), vec![&img, &img2]);
         let files = pdb.get_images_transaction()
-            .including_tag("Huhu")
+            .including_tag(&"general:Huhu".parse().unwrap())
             .execute()
             .unwrap();
-        assert_eq!(files, vec![get_test_image2()]);
+        assert_eq!(files.iter().map(|i| i.get_image()).collect::<Vec<&ImageHandle>>(), vec![&img2]);
         let files = pdb.get_images_transaction()
-            .excluding_tag("Huhu")
+            .excluding_tag(&"general:Huhu".parse().unwrap())
             .execute()
             .unwrap();
-        assert_eq!(files, vec![get_test_image()]);
+        assert_eq!(files.iter().map(|i| i.get_image()).collect::<Vec<&ImageHandle>>(), vec![&img]);
         let files = pdb.get_images_transaction()
-            .including_tag("Haha")
-            .excluding_tag("Huhu")
+            .including_tag(&"general:Haha".parse().unwrap())
+            .excluding_tag(&"general:Huhu".parse().unwrap())
             .execute()
             .unwrap();
-        assert_eq!(files, vec![get_test_image()]);
+        assert_eq!(files.iter().map(|i| i.get_image()).collect::<Vec<&ImageHandle>>(), vec![&img]);
     }
 
     #[test]
@@ -334,8 +369,9 @@ mod tests {
             "general:Huhu".parse().unwrap()
         ];
         add_test_image(&mut pdb).unwrap();
+        let img = get_test_image();
         pdb.update_images_transaction()
-            .for_image(get_test_image().get_filename())
+            .for_image(&img)
             .add_tags(&tags_to_add)
             .execute()
             .unwrap();
@@ -365,8 +401,9 @@ mod tests {
             "general:Hoho".parse().unwrap()
         ];
         add_test_image(&mut pdb).unwrap();
+        let img = get_test_image();
         pdb.update_images_transaction()
-            .for_image(&get_test_image().get_filename())
+            .for_image(&img)
             .add_tags(&tags_to_add)
             .execute()
             .unwrap();
@@ -397,27 +434,29 @@ mod tests {
             "general:Hoho".parse().unwrap()
         ];
         add_test_image(&mut pdb).unwrap();
+        let img = get_test_image();
         pdb.update_images_transaction()
-            .for_image(&get_test_image().get_filename())
+            .for_image(&img)
             .add_tags(&tags_to_add)
             .execute()
             .unwrap();
 
         add_test_image2(&mut pdb).unwrap();
+        let img2 = get_test_image2();
 
         let file = PathBuf::from("./test/test_db_import.txt");
 
         pdb.import_tags(file.as_path()).unwrap();
 
-        let img1 = pdb.get_image_transaction(&get_test_image().get_filename()).execute().unwrap().unwrap();
-        let sauce1 = img1.get_sauce();
+        let imgi1 = pdb.get_image_transaction(&img).execute().unwrap().unwrap();
+        let sauce1 = imgi1.get_sauce();
         assert_eq!(sauce1, &Sauce::Match(sauce::url_from_str("http://domain.found.hehe/cool/tags?cool=yes").unwrap()));
 
-        let img2 = pdb.get_image_transaction(&get_test_image2().get_filename()).execute().unwrap().unwrap();
-        let sauce2 = img2.get_sauce();
-        assert_eq!(sauce2, get_test_image2().get_sauce());
+        let imgi2 = pdb.get_image_transaction(&img2).execute().unwrap().unwrap();
+        let sauce2 = imgi2.get_sauce();
+        assert_eq!(sauce2, &Sauce::Match(sauce::url_from_str("http://real.url").unwrap()));
 
-        let image = pdb.get_image_transaction("00001874f801fd63-03f07d07b03b05f3370670df0db0ff031111.jpg").execute().unwrap();
+        let image = pdb.get_image_transaction(&ImageHandle::new("00001874f801fd63-03f07d07b03b05f3370670df0db0ff031111.jpg".to_string()).unwrap()).execute().unwrap();
         assert_eq!(image, None);
     }
 
@@ -429,7 +468,7 @@ mod tests {
 
         let file = PathBuf::from("./test/test_db_import_fail.txt");
         assert!(match pdb.import_tags(file.as_path()).unwrap_err() {
-            e @Error::InvalidImportFileFormat(_, _) => { println!("{}", e); true },
+            e @Error::DatabaseVersionMismatch(_, _, _) => { println!("{:?}", e); true },
             _ => false
         });
     }
@@ -461,8 +500,9 @@ mod tests {
         ];
         let sauce1_update = Sauce::Match(sauce::url_from_str("https://export.url.com/final").unwrap());
         add_test_image(&mut pdb).unwrap();
+        let img = get_test_image();
         pdb.update_images_transaction()
-            .for_image(&get_test_image().get_filename())
+            .for_image(&img)
             .add_tags(&tags_to_add1)
             .update_sauce(&sauce1_update)
             .execute()
@@ -474,8 +514,9 @@ mod tests {
             "character:Hihi2".parse().unwrap(),
         ];
         add_test_image2(&mut pdb).unwrap();
+        let img2 = get_test_image2();
         pdb.update_images_transaction()
-            .for_image(&get_test_image2().get_filename())
+            .for_image(&img2)
             .add_tags(&tags_to_add2)
             .execute()
             .unwrap();
@@ -490,16 +531,17 @@ mod tests {
         add_test_image2(&mut pdb).unwrap();
         pdb.import_tags(file.as_path()).unwrap();
 
-        let img1 = pdb.get_image_transaction(&get_test_image().get_filename()).execute().unwrap().unwrap();
-        let sauce1 = img1.get_sauce();
+        let imgi1 = pdb.get_image_transaction(&img).execute().unwrap().unwrap();
+        let sauce1 = imgi1.get_sauce();
         assert_eq!(sauce1, &sauce1_update);
 
-        let img2 = pdb.get_image_transaction(&get_test_image2().get_filename()).execute().unwrap().unwrap();
-        let sauce2 = img2.get_sauce();
-        assert_eq!(sauce2, get_test_image2().get_sauce());
+        let imgi2 = pdb.get_image_transaction(&img2).execute().unwrap().unwrap();
+        let sauce2 = imgi2.get_sauce();
+        assert_eq!(sauce2, &Sauce::Match(sauce::url_from_str("http://real.url").unwrap()));
 
-        let img3 = pdb.get_image_transaction(&get_test_image3().get_filename()).execute().unwrap();
-        assert_eq!(img3, None);
+        let img3 = get_test_image3();
+        let imgi3 = pdb.get_image_transaction(&img3).execute().unwrap();
+        assert_eq!(imgi3, None);
     }
 
     fn get_pantsu_db(path: Option<&Path>) -> Result<PantsuDB, Error> {
@@ -516,32 +558,50 @@ mod tests {
     }
 
     fn add_test_image(pdb: &mut PantsuDB) -> Result<(), Error> {
+        let img = get_test_image();
         pdb.add_images_transaction()
-            .add_image(&get_test_image())
-            .execute()
+            .add_image(&img, (100, 200))
+            .execute()?;
+        pdb.update_images_transaction()
+            .for_image(&img)
+            .update_sauce(&Sauce::NotChecked)
+            .execute()?;
+        Ok(())
     }
 
     fn add_test_image2(pdb: &mut PantsuDB) -> Result<(), Error> {
+        let img = get_test_image2();
         pdb.add_images_transaction()
-            .add_image(&get_test_image2())
-            .execute()
+            .add_image(&img, (0, 0))
+            .execute()?;
+        pdb.update_images_transaction()
+            .for_image(&img)
+            .update_sauce(&Sauce::Match(sauce::url_from_str("http://real.url").unwrap()))
+            .execute()?;
+        Ok(())
     }
 
     fn add_test_image3(pdb: &mut PantsuDB) -> Result<(), Error> {
+        let img = get_test_image3();
         pdb.add_images_transaction()
-            .add_image(&get_test_image3())
-            .execute()
+            .add_image(&img, (4269, 1337))
+            .execute()?;
+        pdb.update_images_transaction()
+            .for_image(&img)
+            .update_sauce(&Sauce::NotExisting)
+            .execute()?;
+        Ok(())
     }
 
     fn get_test_image() -> ImageHandle {
-        ImageHandle::new(String::from("1b64e362cdf968d9-c1fc07e23e05e2fc0be39ce8cc88f8044fcf.jpg"), Sauce::NotChecked, (100, 200))
+        ImageHandle::new(String::from("1b64e362cdf968d9-c1fc07e23e05e2fc0be39ce8cc88f8044fcf.jpg")).unwrap()
     }
 
     fn get_test_image2() -> ImageHandle {
-        ImageHandle::new(String::from("c3811874f801fd63-03f07d07b03b05f3370670df0db0ff037037.jpg"), Sauce::Match(sauce::url_from_str("http://real.url").unwrap()), (0, 0))
+        ImageHandle::new(String::from("c3811874f801fd63-03f07d07b03b05f3370670df0db0ff037037.jpg")).unwrap()
     }
 
     fn get_test_image3() -> ImageHandle {
-        ImageHandle::new(String::from("000011152151fec3-03f07d07b03b05f3370670df0db0ff000000.jpg"), Sauce::NotExisting, (4269, 1337))
+        ImageHandle::new(String::from("000011152151fec3-03f07d07b03b05f3370670df0db0ff000000.jpg")).unwrap()
     }
 }

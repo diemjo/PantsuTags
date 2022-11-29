@@ -1,6 +1,6 @@
 use clap::{Parser, ArgGroup, AppSettings};
 use std::path::PathBuf;
-use pantsu_tags::{PantsuTag, PantsuTagType};
+use pantsu_tags::{PantsuTagType};
 
 #[derive(Debug, Parser)]
 #[clap(name = "PantsuTags", about = "PantsuTags CLI", setting = AppSettings::SubcommandPrecedenceOverArg)]
@@ -37,8 +37,8 @@ pub struct RemoveImagesArgs {
 pub struct AddTagsArgs {
     #[clap(short, long, parse(from_os_str), required=true, min_values=1)]
     pub images: Vec<PathBuf>,
-    #[clap(short, long, parse(try_from_str), required=true, min_values=1)]
-    pub tags: Vec<PantsuTag>,
+    #[clap(short, long, required=true, min_values=1)]
+    pub tags: Vec<String>,
 }
 
 #[derive(Debug, Parser)]

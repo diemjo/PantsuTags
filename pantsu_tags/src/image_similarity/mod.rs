@@ -38,6 +38,7 @@ impl<'a> SimilarImagesGroup<'a> {
 pub struct ImageToImport {
     pub current_path: PathBuf,
     pub image_handle: ImageHandle,
+    pub res: (u32, u32)
 }
 
 impl NamedImage for ImageToImport {

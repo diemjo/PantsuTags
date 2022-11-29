@@ -2,7 +2,7 @@ use std::path::Path;
 use rusqlite::{Connection, OpenFlags};
 use crate::common::error::{Error};
 use log::{debug};
-use crate::db::sqlite_statements;
+use crate::db::{db_calls, sqlite_statements};
 
 pub fn open(db_path: &Path) -> Result<Connection, Error> {
     let pantsu_db_updates: Vec<&dyn Fn(&mut Connection) -> Result<(), Error>> = vec![
@@ -19,7 +19,7 @@ pub fn open(db_path: &Path) -> Result<Connection, Error> {
             conn
         }
     };
-    let current_db_version = conn.pragma_query_value(None, "user_version", |r| r.get(0))?;
+    let current_db_version = db_calls::db_version(&conn)?;
     if pantsu_db_newest_version < current_db_version {
         return Err(Error::ProgramOutdated(format!("Expected database version <={} but found version {}", pantsu_db_newest_version, current_db_version)));
     } else if pantsu_db_newest_version > current_db_version {

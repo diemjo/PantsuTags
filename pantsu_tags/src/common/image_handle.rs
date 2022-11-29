@@ -2,23 +2,21 @@ use std::fmt::{Debug, Display, Formatter};
 use std::hash::Hash;
 use std::path::{Path, PathBuf};
 
-use crate::sauce::Sauce;
+use crate::{file_handler, Error, Result};
 use crate::image_similarity::NamedImage;
 
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct ImageHandle {
     filename: String,
-    file_source: Sauce,
-    file_res: (u32, u32),
 }
 
 impl ImageHandle {
-    pub(crate) fn new(filename: String, file_source: Sauce, file_res: (u32, u32)) -> ImageHandle {
-        ImageHandle {
-            filename,
-            file_source,
-            file_res
+    pub fn new(filename: String) -> Result<ImageHandle> {
+        if file_handler::filename_is_valid(&filename) {
+            Ok(ImageHandle { filename })
+        } else {
+            Err(Error::InvalidFilename(String::from(filename)))
         }
     }
 
@@ -27,19 +25,11 @@ impl ImageHandle {
     }
 
     pub fn get_path(&self, lib_path: &Path) -> PathBuf { lib_path.join(&self.filename) }
-
-    pub fn get_sauce(&self) -> &Sauce {
-        &self.file_source
-    }
-
-    pub fn get_res(&self) -> (u32, u32) {
-        self.file_res
-    }
 }
 
 impl Display for ImageHandle {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}: res={:>12}, sauce='{}'", self.filename, format!("({},{})", self.file_res.0, self.file_res.1), self.get_sauce())
+        write!(f, "{}", self.filename)
     }
 }
 

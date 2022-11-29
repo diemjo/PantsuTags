@@ -5,7 +5,7 @@ use colored::Colorize;
 use pantsu_tags::{Error, PantsuTagType};
 use pantsu_tags::db::PantsuDB;
 
-use crate::common::{AppResult, valid_filename_from_path};
+use crate::common::{AppResult, self};
 use crate::CONFIGURATION;
 
 pub fn list_tags(images: Vec<PathBuf>, tag_types: Vec<PantsuTagType>, do_print_tagnames: bool) -> AppResult<()> {
@@ -21,12 +21,11 @@ fn list_tags_for_images(images: Vec<PathBuf>, tag_types: Vec<PantsuTagType>, do_
     let db = PantsuDB::new(CONFIGURATION.database_path.as_path())?;
     let len = images.len();
     for (i, path) in images.into_iter().enumerate() {
-        let image = valid_filename_from_path(&path)?;
-        let image = db.get_image_transaction(&image)
+        let image = common::image_handle_from_path(&path)?;
+        let _ = db.get_image_transaction(&image)
             .execute()?
-            .ok_or_else(|| Error::ImageNotFoundInDB(image))?;
-        let tags = db.get_tags_transaction()
-            .for_image(image.get_filename())
+            .ok_or_else(|| Error::ImageNotFoundInDB(image.get_filename().to_string()))?;
+        let tags = db.get_image_tags_transaction(&image)
             .with_types(&tag_types)
             .execute()?;
 
@@ -34,7 +33,7 @@ fn list_tags_for_images(images: Vec<PathBuf>, tag_types: Vec<PantsuTagType>, do_
             println!("{}:", image.get_filename().green());
         }
         for tag in tags {
-            println!("{}", if do_print_tagnames { tag.tag_name } else { tag.to_string() } );
+            println!("{}", if do_print_tagnames { tag.tag.tag_name } else { tag.tag.to_string() } );
         }
         if i<len-1 {
             println!();

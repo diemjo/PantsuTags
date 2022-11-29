@@ -1,10 +1,10 @@
 use crate::common::error::Result;
-use crate::ImageHandle;
+use crate::{ImageInfo};
 use crate::file_handler::hash;
 use crate::image_similarity::{ImageToImport, NamedImage};
 use super::SimilarImagesGroup;
 
-pub fn group_similar_images<'a>(new_images: &'a Vec<ImageToImport>, images_in_db: &'a Vec<ImageHandle>) -> Result<Vec<SimilarImagesGroup<'a>>> {
+pub fn group_similar_images<'a>(new_images: &'a Vec<ImageToImport>, images_in_db: &'a Vec<ImageInfo>) -> Result<Vec<SimilarImagesGroup<'a>>> {
     let mut image_groups: Vec<SimilarImagesGroup> = Vec::new();
     for image in new_images {
         let group = match try_add_to_existing_image_group(image, &mut image_groups)? {
@@ -41,8 +41,8 @@ fn add_to_new_image_group<'a, 'b>(image: &'a ImageToImport, image_groups: &'b mu
 }
 
 /// add all old images that are similar to image to image_group
-fn add_similar_old_images<'a>(image: &ImageToImport, image_group: &mut SimilarImagesGroup<'a>, old_images: &'a Vec<ImageHandle>) -> Result<()>{
-    let similar_old_images = get_similar_images(image,old_images.iter())?;
+fn add_similar_old_images<'a>(image: &ImageToImport, image_group: &mut SimilarImagesGroup<'a>, old_images: &'a Vec<ImageInfo>) -> Result<()>{
+    let similar_old_images = get_similar_images(image,old_images.iter().map(|i| i.get_image()))?;
     image_group.old_images.extend(similar_old_images);
     Ok(())
 }

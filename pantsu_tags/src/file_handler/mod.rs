@@ -5,11 +5,6 @@ use regex::Regex;
 pub mod hash;
 pub mod import;
 
-pub(crate) struct ImageInfo {
-    pub filename: String,
-    pub file_res: (u32, u32)
-}
-
 pub fn default_db_dir() -> PathBuf {
     match ProjectDirs::from("moe", "karpador", "PantsuTags") {
         Some(project_dir) => {
@@ -53,7 +48,7 @@ mod tests {
     fn test_hash() {
         let file = "https://img1.gelbooru.com/images/4f/76/4f76b8d52983af1d28b1bf8d830d684e.png";
         let file_path = prepare_image(file);
-        let hash_name = hash::calculate_fileinfo(&file_path).unwrap().filename;
+        let hash_name = hash::calculate_fileinfo(&file_path).unwrap().0;
         println!("{} -> {}", file_path.file_name().unwrap().to_str().unwrap(), hash_name);
     }
 
@@ -61,11 +56,10 @@ mod tests {
     fn test_hard_link() {
         let file = "https://img1.gelbooru.com/images/4f/76/4f76b8d52983af1d28b1bf8d830d684e.png";
         let file_path = prepare_image(file);
-        let new_filename = hash::calculate_fileinfo(&file_path).unwrap().filename;
+        let image_handle = hash::calculate_fileinfo(&file_path).unwrap().0;
         let lib_dir = Path::new("./");
-        import::import_file(lib_dir, &file_path, &new_filename, false).unwrap();
-        let mut new_path = PathBuf::from(lib_dir);
-        new_path.push(new_filename);
+        import::import_file(lib_dir, &file_path, &image_handle, false).unwrap();
+        let new_path = Path::new(lib_dir).join(image_handle.get_filename());
         assert!(new_path.exists());
         std::fs::remove_file(new_path).unwrap();
     }

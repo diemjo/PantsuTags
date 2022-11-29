@@ -6,6 +6,7 @@ use crate::file_handler::import;
 pub use crate::common::error::Error;
 pub use crate::common::error::Result;
 pub use crate::common::image_handle::ImageHandle;
+pub use crate::common::image_info::ImageInfo;
 pub use crate::sauce::Sauce;
 pub use crate::common::pantsu_tag::{PantsuTag, PantsuTagType};
 pub use crate::common::tmp_dir::TmpFile;
@@ -22,20 +23,21 @@ pub mod file_handler;
 
 // This check can fail with Error::ImageLoadError or Error:ImageAlreadyExists
 pub fn check_image(pantsu_db: &mut PantsuDB, image_path: &Path) -> Result<ImageToImport> {
-    let image_info = file_handler::hash::calculate_fileinfo(image_path)?;
-    if pantsu_db.get_image_transaction(image_info.filename.as_str()).execute()?.is_some() {
+    let (image_handle, res) = file_handler::hash::calculate_fileinfo(image_path)?;
+    if pantsu_db.get_image_transaction(&image_handle).execute()?.is_some() {
         return Err(Error::ImageAlreadyExists(common::get_path(image_path)));
     }
-    let image_handle = ImageHandle::new(image_info.filename, Sauce::NotChecked, image_info.file_res); 
     Ok(ImageToImport {
         current_path: PathBuf::from(image_path),
         image_handle,
+        res
     } )
 }
 
 pub fn import_image(pantsu_db: &mut PantsuDB, lib: &Path, image: &ImageToImport, always_copy: bool) -> Result<()> { // todo: could consume imageToImport
-    import::import_file(lib, &image.current_path, image.image_handle.get_filename(), always_copy)?;
-    pantsu_db.add_images_transaction().add_image(&image.image_handle).execute()
+    import::import_file(lib, &image.current_path, &image.image_handle, always_copy)?;
+    pantsu_db.add_images_transaction().add_image(&image.image_handle, image.res).execute()?;
+    Ok(())
 }
 
 
@@ -56,7 +58,6 @@ mod tests {
     use std::path::{Path, PathBuf};
     use crate::{PantsuDB, Sauce, sauce};
     use serial_test::serial;
-    use crate::image_similarity::NamedImage;
 
     #[tokio::test]
     #[serial]
@@ -72,7 +73,7 @@ mod tests {
         let best_match = &sauces[0];
         // in general, you would want to check the similarity here
         let tags = crate::get_sauce_tags(&best_match).await.unwrap();
-        pdb.update_images_transaction().for_image(new_image.get_name()).update_sauce(&Sauce::Match(sauce::url_from_str(&best_match.link).unwrap())).add_tags(&tags).execute().unwrap();
+        pdb.update_images_transaction().for_image(&new_image.image_handle).update_sauce(&Sauce::Match(sauce::url_from_str(&best_match.link).unwrap())).add_tags(&tags).execute().unwrap();
     }
 
     // todo: this test does not really make sense anymore, since import_image() will always succeed even if images are similar. Move to image_similarity module and make into proper test

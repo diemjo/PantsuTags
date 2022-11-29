@@ -93,8 +93,9 @@ mod tests {
     use std::io::Cursor;
     use std::path::PathBuf;
     use crate::common::pantsu_tag::{PantsuTag, PantsuTagType};
+    use crate::file_handler::hash::{self};
     use crate::sauce::{sauce_finder, tag_finder};
-    use crate::SauceMatch;
+    use crate::{SauceMatch};
 
     fn prepare_image(image_link: &str) -> PathBuf {
         let image_name = image_link.rsplit('/').next().unwrap();
@@ -115,10 +116,14 @@ mod tests {
         let sauce_link = "http://gelbooru.com/index.php?page=post&s=list&md5=4f76b8d52983af1d28b1bf8d830d684e";
         let image_link = "https://img1.gelbooru.com/images/4f/76/4f76b8d52983af1d28b1bf8d830d684e.png";
         let path = prepare_image(image_link);
+        let image = hash::calculate_fileinfo(&path).unwrap().0;
+        std::fs::copy(path, image.get_filename()).unwrap();
+        //let image = ImageHandle::new(path.file_name().unwrap().to_str().unwrap().to_string(), Sauce::NotChecked, (0, 0));
 
-        let sauces = sauce_finder::find_sauce(path).await.unwrap();
+        let sauces = sauce_finder::find_sauce(&image, &PathBuf::from(".")).await.unwrap();
+        std::fs::remove_file(image.get_filename()).unwrap();
         assert_eq!(sauces[0].link, sauce_link);
-        assert_eq!(sauces[0].similarity, 96);
+        assert_eq!(sauces[0].similarity, 95);
         assert_eq!(sauces[0].resolution, (533, 745));
     }
 
@@ -156,7 +161,7 @@ mod tests {
     #[tokio::test]
     async fn find_tags_rating() {
         let links: Vec<(&str, &str)> = vec![
-            ("https://gelbooru.com/index.php?page=post&s=view&id=6250367&tags=rurudo", "Safe"),
+            ("https://gelbooru.com/index.php?page=post&s=view&id=6250367&tags=rurudo", "Sensitive"),
             ("https://gelbooru.com/index.php?page=post&s=view&id=5558687&tags=rurudo", "Questionable"),
             ("https://gelbooru.com/index.php?page=post&s=view&id=5591747&tags=rurudo", "Explicit"),
         ];

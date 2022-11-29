@@ -3,6 +3,7 @@ use std::path::Path;
 pub mod error;
 pub mod pantsu_tag;
 pub mod image_handle;
+pub mod image_info;
 pub mod tmp_dir;
 
 pub use tmp_dir::tmp_dir_async as tmp_dir_async;

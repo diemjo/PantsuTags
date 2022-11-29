@@ -3,9 +3,8 @@ use std::str::FromStr;
 use blockhash::{Blockhash144, Image};
 use image::{DynamicImage, GenericImageView};
 use lz_fnv::{Fnv1a, FnvHasher};
-use crate::{common, Error};
+use crate::{common, Error, ImageHandle};
 use crate::common::error::{Result};
-use crate::file_handler::ImageInfo;
 
 struct AdapterImage<'a> {
     pub image: &'a DynamicImage,
@@ -21,7 +20,7 @@ impl<'a> Image for AdapterImage<'a> {
     }
 }
 
-pub(crate) fn calculate_fileinfo(path: &Path) -> Result<ImageInfo> {
+pub(crate) fn calculate_fileinfo(path: &Path) -> Result<(ImageHandle, (u32, u32))> {
     let file_content = std::fs::read(&path).or_else(|_|
         Err(Error::ImageLoadError(common::get_path(&path)))
     )?;
@@ -32,11 +31,9 @@ pub(crate) fn calculate_fileinfo(path: &Path) -> Result<ImageInfo> {
     )?;
     let fnv1a_hash = get_fnv1a_hash(&file_content);
     let perceptual_hash = get_perceptual_hash(&image);
+    let image_handle = ImageHandle::new(format!("{}-{}.{}", fnv1a_hash, perceptual_hash, file_extension))?;
 
-    Ok(ImageInfo {
-        filename: format!("{}-{}.{}", fnv1a_hash, perceptual_hash, file_extension),
-        file_res: image.dimensions()
-    })
+    Ok((image_handle, image.dimensions()))
 }
 
 pub(crate) fn extract_hash(filename: &str) -> Result<Blockhash144> {
