@@ -6,9 +6,12 @@ use crate::common::{AppResult};
 use crate::{common, CONFIGURATION};
 
 pub fn list_images(included_tags: &Vec<String>, excluded_tags: &Vec<String>, ratio: AspectRatio, do_print_filenames: bool,
-                   sauce_existing: bool, sauce_not_existing: bool, sauce_not_checked: bool,
+                   sauce_existing: bool, sauce_not_existing: bool, sauce_not_checked: bool, sort_order: Vec<String>,
                    temp_dir: Option<PathBuf>) -> AppResult<()> {
     let pdb = PantsuDB::new(CONFIGURATION.database_path.as_path())?;
+
+    let sort_order = common::parse_image_sort_order(sort_order)?;
+    
     let included_tags = included_tags.into_iter()
         .map(|t| PantsuTag::from_str(t).or_else(|_| Ok(PantsuTag::new(t.to_string(), pantsu_tags::PantsuTagType::General))))
         .collect::<AppResult<Vec<PantsuTag>>>()?;
@@ -30,7 +33,10 @@ pub fn list_images(included_tags: &Vec<String>, excluded_tags: &Vec<String>, rat
         images_transaction
     };
 
-    let images = images_transaction.execute()?;
+    let images = match sort_order {
+        Some(order) => images_transaction.sort_by(&order).execute()?,
+        None => images_transaction.execute()?
+    };
 
     let lib_dir = CONFIGURATION.library_path.as_path();
     match temp_dir {

@@ -4,6 +4,7 @@ use log::warn;
 use rusqlite::Connection;
 use crate::common::image_info::ImageInfo;
 use crate::common::pantsu_tag::PantsuTagInfo;
+use crate::db::sort::{SortOrder, TagSortOption, ImageSortOption, self};
 use crate::db::{AspectRatio, db_calls, SauceType};
 use crate::{ImageHandle, PantsuTag, PantsuTagType};
 use crate::error::Result;
@@ -35,6 +36,7 @@ pub struct SelectImagesTransaction<'a> {
     exclude_tags: HashSet<PantsuTag>,
     ratio: AspectRatio,
     sauce_type: SauceType,
+    sort_order: &'a SortOrder<ImageSortOption>,
 }
 
 impl<'a> SelectImagesTransaction<'a> {
@@ -45,6 +47,7 @@ impl<'a> SelectImagesTransaction<'a> {
             exclude_tags: HashSet::new(),
             ratio: AspectRatio::Any,
             sauce_type: SauceType::Any,
+            sort_order: &sort::DEFAULT_IMAGE_SORT,
         }
     }
 
@@ -88,9 +91,14 @@ impl<'a> SelectImagesTransaction<'a> {
         self
     }
 
+    pub fn sort_by(mut self, sort_order: &'a SortOrder<ImageSortOption>) -> Self {
+        self.sort_order = sort_order;
+        self
+    }
+
 //impl<'a> PantsuTransaction<Vec<ImageHandle>> for SelectImagesTransaction<'a> {
     pub fn execute(self) -> Result<Vec<ImageInfo>> {
-        let images = db_calls::get_images(self.connection, &Vec::from_iter(self.include_tags), &Vec::from_iter(self.exclude_tags), self.sauce_type)?;
+        let images = db_calls::get_images(self.connection, &Vec::from_iter(self.include_tags), &Vec::from_iter(self.exclude_tags), self.sauce_type, self.sort_order)?;
         let images = match self.ratio {
             AspectRatio::Any => images,
             AspectRatio:: Max(max) => images.into_iter()
@@ -150,6 +158,7 @@ pub struct SelectImageTagsTransaction<'a> {
     connection: &'a Connection,
     image: &'a ImageHandle,
     types: HashSet<PantsuTagType>,
+    sort_order: &'a SortOrder<TagSortOption>
 }
 
 impl<'a> SelectImageTagsTransaction<'a> {
@@ -158,11 +167,17 @@ impl<'a> SelectImageTagsTransaction<'a> {
             connection,
             image: image,
             types: HashSet::new(),
+            sort_order: &sort::DEFAULT_TAG_SORT
         }
     }
 
     pub fn with_types(mut self, types: &Vec<PantsuTagType>) -> Self {
         self.types.extend(types);
+        self
+    }
+
+    pub fn sort_by(mut self, sort_order: &'a SortOrder<TagSortOption>) -> Self {
+        self.sort_order = sort_order;
         self
     }
 
@@ -172,9 +187,9 @@ impl<'a> SelectImageTagsTransaction<'a> {
         match db_image {
             Some(_) => {
                 if self.types.len()==0 {
-                    db_calls::get_tags_for_image(self.connection, self.image)
+                    db_calls::get_tags_for_image(self.connection, self.image, self.sort_order)
                 } else {
-                    db_calls::get_tags_for_image_with_types(self.connection, self.image, &Vec::from_iter(self.types))
+                    db_calls::get_tags_for_image_with_types(self.connection, self.image, &Vec::from_iter(self.types), self.sort_order)
                 }
             },
             None => {

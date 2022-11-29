@@ -1,5 +1,5 @@
-use std::path::Path;
-use pantsu_tags::{Error, ImageHandle};
+use std::{path::Path, str::FromStr};
+use pantsu_tags::{Error, ImageHandle, db::sort::{SortOrder, ImageSortOption, TagSortOption}};
 use tokio::task::JoinError;
 
 pub type AppResult<T> = std::result::Result<T, AppError>;
@@ -27,6 +27,28 @@ pub fn image_handle_from_path(path: &Path) -> AppResult<ImageHandle> {
     let filename = get_filename(path)?;
     let image_handle = ImageHandle::new(filename)?;
     Ok(image_handle)
+}
+
+pub fn parse_image_sort_order(options: Vec<String>) -> AppResult<Option<SortOrder<ImageSortOption>>> {
+    let options = options.iter()
+        .map(|o| ImageSortOption::from_str(o).or_else(|e| Err(AppError::LibError(e))))
+        .collect::<AppResult<Vec<ImageSortOption>>>()?;
+    match SortOrder::<ImageSortOption>::new(options) {
+        Ok(s) => Ok(Some(s)),
+        Err(Error::NoSortingOptionSpecified) => Ok(None),
+        Err(e) => Err(e)?
+    }
+}
+
+pub fn parse_tag_sort_order(options: Vec<String>) -> AppResult<Option<SortOrder<TagSortOption>>> {
+    let options = options.iter()
+        .map(|o| TagSortOption::from_str(o).or_else(|e| Err(AppError::LibError(e))))
+        .collect::<AppResult<Vec<TagSortOption>>>()?;
+    match SortOrder::<TagSortOption>::new(options) {
+        Ok(s) => Ok(Some(s)),
+        Err(Error::NoSortingOptionSpecified) => Ok(None),
+        Err(e) => Err(e)?
+    }
 }
 
 #[derive(Debug, thiserror::Error)]

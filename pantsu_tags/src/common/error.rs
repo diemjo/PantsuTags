@@ -51,6 +51,15 @@ pub enum Error {
     #[error("Invalid NaiveDateTime format: {0}")]
     InvalidDateFormat(#[source] ParseError),
 
+    #[error("Invalid sort option: {0}, available options: '{1}'")]
+    InvalidSortingOption(String, String),
+
+    #[error("Invalid sort option: {0}, every option can only be used once")]
+    RepeatedSortingOption(String),
+
+    #[error("No sort options specified, must contain at least one option")]
+    NoSortingOptionSpecified,
+
     #[error("Similar images to '{0}' already exist in database: '{1:?}'")]
     SimilarImagesExist(PathBuf, Vec<ImageHandle>), // Path is the path to the new images before inserting it in the db
 

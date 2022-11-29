@@ -55,6 +55,9 @@ pub struct ListTagsArgs {
     pub images: Vec<PathBuf>,
     #[clap(short, long="types", min_values(1), parse(try_from_str))]
     pub tag_types: Vec<PantsuTagType>,
+    
+    #[clap(long="sort-by")]
+    pub sort_order: Vec<String>,
 
     #[clap(short='p', long)]
     pub print_tagnames: bool,
@@ -64,6 +67,9 @@ pub struct ListTagsArgs {
 pub struct ImageInfosArgs {
     #[clap(short, long, min_values(1), parse(from_os_str))]
     pub images: Vec<PathBuf>,
+    
+    #[clap(long="sort-by")]
+    pub sort_order: Vec<String>,
 }
 
 #[derive(Debug, Parser)]
@@ -88,6 +94,9 @@ pub struct ListImagesArgs {
     pub sauce_not_existing: bool,
     #[clap(short='c', long)]
     pub sauce_not_checked: bool,
+
+    #[clap(long="sort-by")]
+    pub sort_order: Vec<String>,
 }
 
 #[derive(Debug, Parser)]

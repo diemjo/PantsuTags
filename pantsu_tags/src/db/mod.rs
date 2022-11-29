@@ -10,6 +10,7 @@ mod sqlite_statements;
 mod db_init;
 mod transactions;
 mod db_import_export;
+pub mod sort;
 
 pub enum AspectRatio {
     Any,

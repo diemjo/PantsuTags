@@ -42,11 +42,11 @@ fn main() -> Result<(), AppError> {
         },
         Args::ListTags(args) => {
             info!("Running command 'list-tags'");
-            cmds::list_tags(args.images, args.tag_types, args.print_tagnames)
+            cmds::list_tags(args.images, args.tag_types, args.sort_order, args.print_tagnames)
         },
         Args::ImageInfos(args) => {
             info!("Running command 'image-infos'");
-            cmds::image_infos(args.images)
+            cmds::image_infos(args.images, args.sort_order)
         },
         Args::ListImages(args) => {
             info!("Running command 'list-images'");
@@ -55,7 +55,7 @@ fn main() -> Result<(), AppError> {
                 (Some(min), None) => AspectRatio::Min(min),
                 (None, Some(max)) => AspectRatio::Max(max),
                 (None, None) => AspectRatio::Any,
-            }, args.print_filenames, args.sauce_existing, args.sauce_not_existing, args.sauce_not_checked, None)
+            }, args.print_filenames, args.sauce_existing, args.sauce_not_existing, args.sauce_not_checked, args.sort_order, None)
         },
         Args::AutoLookupTags(args) => {
             info!("Running command 'auto-lookup-tags'");

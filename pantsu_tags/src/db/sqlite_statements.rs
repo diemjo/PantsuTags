@@ -31,12 +31,13 @@ pub const SELECT_IMAGE: &str =
     FROM images
     WHERE filename = (?)";
 
+pub const SELECT_IMAGES_SORT_BY: &str = "SORT_ORDER";
 pub const SAUCE_TYPE_PLACEHOLDER: &str = "SAUCE_TYPE";
 pub const SELECT_ALL_IMAGES: &str =
     "SELECT filename, image_source_type, image_source, res_width, res_height, date_added, date_modified
     FROM images
     WHERE image_source_type LIKE 'SAUCE_TYPE'
-    ORDER BY date_added DESC";
+    ORDER BY SORT_ORDER";
 
 pub const SELECT_IMAGES_FOR_TAGS_TAG_COUNT: &str= "TAG_COUNT";
 pub const SELECT_IMAGES_FOR_INCLUDING_TAGS_PLACEHOLDER: &str = "INCLUDE_TAG_LIST";
@@ -51,7 +52,7 @@ pub const SELECT_IMAGES_FOR_INCLUDING_TAGS: &str =
         HAVING COUNT(tag)=TAG_COUNT
     )
     AND image_source_type LIKE 'SAUCE_TYPE'
-    ORDER BY date_added DESC";
+    ORDER BY SORT_ORDER";
 
 pub const SELECT_IMAGES_FOR_EXCLUDING_TAGS_PLACEHOLDER: &str = "EXCLUDE_TAG_LIST";
 pub const SELECT_IMAGES_FOR_EXCLUDING_TAGS: &str =
@@ -65,7 +66,7 @@ pub const SELECT_IMAGES_FOR_EXCLUDING_TAGS: &str =
         HAVING COUNT(tag)>0
     )
     AND image_source_type LIKE 'SAUCE_TYPE'
-    ORDER BY date_added DESC";
+    ORDER BY SORT_ORDER";
 
 pub const SELECT_IMAGES_FOR_INCLUDING_AND_EXCLUDING_TAGS: &str =
     "SELECT DISTINCT filename, image_source_type, image_source, res_width, res_height, date_added, date_modified
@@ -85,14 +86,15 @@ pub const SELECT_IMAGES_FOR_INCLUDING_AND_EXCLUDING_TAGS: &str =
         HAVING COUNT(tag)>0
     )
     AND image_source_type LIKE 'SAUCE_TYPE'
-    ORDER BY date_added DESC";
+    ORDER BY SORT_ORDER";
 
+pub const SELECT_TAGS_SORT_BY: &str = "SORT_ORDER";
 pub const SELECT_TAGS_FOR_IMAGE: &str =
     "SELECT tags.tag, tags.tag_type, image_tags.tag_author, image_tags.date_added
     FROM image_tags
     JOIN tags ON image_tags.tag = tags.tag
     WHERE image_tags.filename = (?)
-    ORDER BY tags.tag_type ASC, tags.tag ASC";
+    ORDER BY SORT_ORDER";
 
 pub const SELECT_ALL_TAGS: &str =
     "SELECT tag, tag_type
@@ -112,7 +114,7 @@ pub const SELECT_TAGS_FOR_IMAGE_WITH_TYPE: &str =
     JOIN tags ON image_tags.tag = tags.tag
     WHERE image_tags.filename = (?)
     AND tags.tag_type IN (TAG_TYPE_LIST)
-    ORDER BY tags.tag_type ASC, tags.tag ASC";
+    ORDER BY SORT_ORDER";
 
 // insert statements
 pub const INSERT_TAG_INTO_TAG_LIST: &str =

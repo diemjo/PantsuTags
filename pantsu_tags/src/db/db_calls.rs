@@ -7,6 +7,8 @@ use crate::common::pantsu_tag::{PantsuTag, PantsuTagType, PantsuTagAuthor, Pants
 use crate::db::{SauceType, sqlite_statements};
 use crate::{Error, Sauce, sauce};
 
+use super::sort::{ImageSortOption, SortOrder, TagSortOption};
+
 pub(crate) fn db_version(connection: &Connection) -> Result<usize> {
     Ok(connection.pragma_query_value(None, "user_version", |r| r.get(0))?)
 }
@@ -112,7 +114,7 @@ pub fn get_all_files(connection: &Connection) -> Result<Vec<ImageHandle>> {
     query_helpers::query_rows_as_files(&mut stmt, [])
 }
 */
-pub(crate) fn get_images(connection: &Connection, included_tags: &Vec<PantsuTag>, excluded_tags: &Vec<PantsuTag>, sauce_type: SauceType) -> Result<Vec<ImageInfo>> {
+pub(crate) fn get_images(connection: &Connection, included_tags: &Vec<PantsuTag>, excluded_tags: &Vec<PantsuTag>, sauce_type: SauceType, sort_order: &SortOrder<ImageSortOption>) -> Result<Vec<ImageInfo>> {
     let formatted_stmt =
         if included_tags.len()!=0 && excluded_tags.len()!=0 {
             sqlite_statements::SELECT_IMAGES_FOR_INCLUDING_AND_EXCLUDING_TAGS
@@ -134,7 +136,9 @@ pub(crate) fn get_images(connection: &Connection, included_tags: &Vec<PantsuTag>
         SauceType::NotExisting => sauce::NOT_EXISTING_FLAG,
         SauceType::NotChecked => sauce::NOT_CHECKED_FLAG,
         SauceType::Any => "%",
-    });
+        });
+    let formatted_stmt = formatted_stmt.replace(sqlite_statements::SELECT_IMAGES_SORT_BY, &sort_order.to_string());
+
     let mut stmt = connection.prepare(&formatted_stmt)?;
 
     let included_tags: Vec<String> = included_tags.iter().map(|t| t.serialize()).collect();
@@ -156,8 +160,9 @@ pub(crate) fn get_images(connection: &Connection, included_tags: &Vec<PantsuTag>
     }
 }
 
-pub(crate) fn get_tags_for_image(connection: &Connection, image: &ImageHandle) -> Result<Vec<PantsuTagInfo>> {
-    let mut stmt = connection.prepare(sqlite_statements::SELECT_TAGS_FOR_IMAGE)?;
+pub(crate) fn get_tags_for_image(connection: &Connection, image: &ImageHandle, sort_order: &SortOrder<TagSortOption>) -> Result<Vec<PantsuTagInfo>> {
+    let formatted_stmt = sqlite_statements::SELECT_TAGS_FOR_IMAGE.replace(sqlite_statements::SELECT_TAGS_SORT_BY, &sort_order.to_string());
+    let mut stmt = connection.prepare(&formatted_stmt)?;
     let rows = stmt.query([image.get_filename()])?;
     query_helpers::query_rows_as_tag_infos(rows)
 }
@@ -178,9 +183,10 @@ pub(crate) fn get_tags_with_types(connection: &Connection, types: &Vec<PantsuTag
     query_helpers::query_rows_as_tags(rows)
 }
 
-pub(crate) fn get_tags_for_image_with_types(connection: &Connection, image: &ImageHandle, types: &Vec<PantsuTagType>) -> Result<Vec<PantsuTagInfo>> {
+pub(crate) fn get_tags_for_image_with_types(connection: &Connection, image: &ImageHandle, types: &Vec<PantsuTagType>, sort_order: &SortOrder<TagSortOption>) -> Result<Vec<PantsuTagInfo>> {
     let formatted_stmt = sqlite_statements::SELECT_TAGS_FOR_IMAGE_WITH_TYPE
-        .replace(sqlite_statements::SELECT_TAGS_WITH_TYPE_PLACEHOLDER, &query_helpers::repeat_vars(types.len()));
+        .replace(sqlite_statements::SELECT_TAGS_WITH_TYPE_PLACEHOLDER, &query_helpers::repeat_vars(types.len()))
+        .replace(sqlite_statements::SELECT_TAGS_SORT_BY, &sort_order.to_string());
     let mut stmt = connection.prepare(&formatted_stmt)?;
 
     let mut vec = vec![image.get_filename().to_string()];
