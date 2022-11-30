@@ -2,15 +2,15 @@ use std::path::{Path, PathBuf};
 use crate::common::error;
 use crate::db::{PantsuDB};
 use crate::file_handler::import;
+use crate::image_similarity::ImageToImport;
 
 pub use crate::common::error::Error;
 pub use crate::common::error::Result;
 pub use crate::common::image_handle::ImageHandle;
 pub use crate::common::image_info::ImageInfo;
-pub use crate::sauce::Sauce;
 pub use crate::common::pantsu_tag::{PantsuTag, PantsuTagType};
 pub use crate::common::tmp_dir::TmpFile;
-use crate::image_similarity::ImageToImport;
+pub use crate::sauce::Sauce;
 pub use crate::sauce::SauceMatch;
 pub use crate::sauce::get_thumbnails;
 pub use crate::sauce::url_from_str;

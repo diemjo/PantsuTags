@@ -36,7 +36,7 @@ pub fn auto_lookup_tags(image_paths: Vec<PathBuf>, sauce_existing: bool, sauce_n
 
 
 async fn auto_lookup_tags_async(pdb: PantsuDB, images: HashSet<ImageInfo>) -> AppResult<(PantsuDB,AutoTaggingStats,Vec<SauceUnsure>)> {
-    let tagging_stats = AutoTaggingStats::default();
+    let tagging_stats = AutoTaggingStats::new(images.len() as u64);
     let unsure_sauces: Vec<SauceUnsure> = Vec::new();
 
     let res = stream::iter(images)
@@ -56,6 +56,7 @@ async fn auto_lookup_tags_async(pdb: PantsuDB, images: HashSet<ImageInfo>) -> Ap
                 }
                 SauceJudgement::Unsure(unsure) => {
                     unsures.push(unsure);
+                    stats.unsure += 1;
                     println!("{} - {}", "Source could be wrong    ".yellow(), image_name);
                 }
                 SauceJudgement::NotExisting => {
@@ -177,7 +178,7 @@ fn resolve_sauce_thread(mut pdb: PantsuDB, mut rx: Receiver<ResolveRequest>, num
                     .update_sauce(&Sauce::Match(pantsu_tags::url_from_str(&correct_sauce.link)?))
                     .add_tags(&tags)
                     .execute()?;
-                stats.success += 1;
+                stats.unsure_success += 1;
                 println!("{}", "Successfully added tags to image".green());
                 info!("Added tags {} to image: '{}'", PantsuTag::display_vec(&tags), image.image_handle.get_filename());
                 break;
@@ -187,16 +188,15 @@ fn resolve_sauce_thread(mut pdb: PantsuDB, mut rx: Receiver<ResolveRequest>, num
                     .for_image(&image.image_handle)
                     .update_sauce(&Sauce::NotExisting)
                     .execute()?;
-                stats.no_source += 1;
+                stats.unsure_no_source += 1;
                 println!("No tags added");
                 warn!("Set sauce '{}' to image: '{}'", "NOT_EXISTING", image.image_handle.get_filename());
                 break;
             }
             else if input.eq("s") {
+                stats.skip_unsure();
                 println!("Skip remaining images");
                 thumb_displayer.kill_feh();
-
-                // todo: adjust stats (include skipped images)
                 return Ok(stats);
             }
             println!("Invalid input");
@@ -225,19 +225,42 @@ fn get_images(pdb: &PantsuDB, image_paths: &Vec<PathBuf>, sauce_existing: bool, 
     Ok(images)
 }
 
-#[derive(Default)]
 struct AutoTaggingStats {
+    total: u64,
     success: u64,
     no_source: u64,
+    unsure: u64,
+    unsure_success: u64,
+    unsure_no_source: u64,
+    unsure_skip: u64,
 }
 impl AutoTaggingStats {
+    fn new(total_images: u64) -> AutoTaggingStats {
+        AutoTaggingStats { total:total_images, success: 0, no_source: 0, unsure: 0, unsure_success: 0, unsure_no_source: 0, unsure_skip: 0 }
+    }
+
+    fn skip_unsure(&mut self) {
+        self.unsure_skip = self.unsure - self.unsure_success - self.unsure_no_source
+    }
+
     fn print_stats(&self) {
-        if self.success > 0 {
-            println!("Successfully tagged: {}", self.success);
+        const TEXT_WIDTH: usize = 17;
+        const NUM_WIDTH: usize = 5;
+        println!("{:<TEXT_WIDTH$}{:>NUM_WIDTH$}", "Total images:", self.total);
+        println!("{:->width$}", "", width = TEXT_WIDTH + NUM_WIDTH);
+        println!("{:<TEXT_WIDTH$}{:>NUM_WIDTH$}", "Source found:", self.success);
+        println!("{:<TEXT_WIDTH$}{:>NUM_WIDTH$}", "Source not found:", self.no_source);
+        println!("{:<TEXT_WIDTH$}{:>NUM_WIDTH$}", "Source unsure:", self.unsure);
+        if self.unsure > 0 {
+            println!("{:<TEXT_WIDTH$}{:>NUM_WIDTH$}", "  Source correct:", self.unsure_success);
+            println!("{:<TEXT_WIDTH$}{:>NUM_WIDTH$}", "  Source wrong:", self.unsure_no_source);
+            if self.unsure_skip > 0 {
+                println!("{:<TEXT_WIDTH$}{:>NUM_WIDTH$}", "  Skipped:", self.unsure_skip);
+            }
         }
-        if self.no_source > 0 {
-            println!("Source not found:    {}", self.no_source);
-        }
+
+        assert_eq!(self.total, self.success + self.no_source + self.unsure);
+        assert_eq!(self.unsure, self.unsure_success + self.unsure_no_source + self.unsure_skip);
     }
 }
 
