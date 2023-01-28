@@ -80,6 +80,8 @@ impl std::fmt::Display for ImageSortOption {
     }
 }
 
+const VALID_IMAGE_OPTIONS: &str = "{name, date_added, date_modified, sauce}:{asc, desc}";
+
 impl FromStr for ImageSortOption {
     type Err = Error;
 
@@ -90,17 +92,17 @@ impl FromStr for ImageSortOption {
                 let direction = match direction {
                     "asc" => Ok(SortDirection::Asc),
                     "desc" => Ok(SortDirection::Desc),
-                    _ => Err(Error::InvalidSortingOption(s.to_string(), VALID_OPTIONS.to_string()))
+                    _ => Err(Error::InvalidSortingOption(s.to_string(), VALID_IMAGE_OPTIONS.to_string()))
                 }?;
                 match variant {
                     "name" => Ok(Self::Name(direction)),
                     "date_added" => Ok(Self::DateAdded(direction)),
                     "date_modified" => Ok(Self::DateModified(direction)),
                     "sauce" => Ok(Self::Sauce(direction)),
-                    _ => Err(Error::InvalidSortingOption(s.to_string(), VALID_OPTIONS.to_string()))
+                    _ => Err(Error::InvalidSortingOption(s.to_string(), VALID_IMAGE_OPTIONS.to_string()))
                 }
             },
-            None => Err(Error::InvalidSortingOption(s.to_string(), VALID_OPTIONS.to_string())),
+            None => Err(Error::InvalidSortingOption(s.to_string(), VALID_IMAGE_OPTIONS.to_string())),
         }
     }
 }
@@ -135,7 +137,7 @@ impl std::fmt::Display for TagSortOption {
     }
 }
 
-const VALID_OPTIONS: &str = "{name, type, author, date_added}:{asc, desc}";
+const VALID_TAG_OPTIONS: &str = "{name, type, author, date_added}:{asc, desc}";
 
 impl FromStr for TagSortOption {
     type Err = Error;
@@ -147,17 +149,17 @@ impl FromStr for TagSortOption {
                 let direction = match direction {
                     "asc" => Ok(SortDirection::Asc),
                     "desc" => Ok(SortDirection::Desc),
-                    _ => Err(Error::InvalidSortingOption(s.to_string(), VALID_OPTIONS.to_string()))
+                    _ => Err(Error::InvalidSortingOption(s.to_string(), VALID_TAG_OPTIONS.to_string()))
                 }?;
                 match variant {
                     "name" => Ok(Self::Name(direction)),
                     "type" => Ok(Self::Type(direction)),
                     "author" => Ok(Self::Author(direction)),
                     "date_added" => Ok(Self::DateAdded(direction)),
-                    _ => Err(Error::InvalidSortingOption(s.to_string(), VALID_OPTIONS.to_string()))
+                    _ => Err(Error::InvalidSortingOption(s.to_string(), VALID_TAG_OPTIONS.to_string()))
                 }
             },
-            None => Err(Error::InvalidSortingOption(s.to_string(), VALID_OPTIONS.to_string())),
+            None => Err(Error::InvalidSortingOption(s.to_string(), VALID_TAG_OPTIONS.to_string())),
         }
     }
 }
