@@ -71,20 +71,23 @@ async fn auto_lookup_tags_async(pdb: PantsuDB, images: HashSet<ImageInfo>) -> Ap
 }
 
 async fn judge_sauce(image: &ImageHandle, sauces: Vec<SauceMatch>) -> AppResult<SauceJudgement> {
-    let relevant_sauces: Vec<SauceMatch> = sauces.into_iter().filter(|s| s.similarity > RELEVANT_SIMILARITY_THESHOLD).collect();
-    match relevant_sauces.first() {
-        Some(sauce) => {
-            if sauce.similarity > FOUND_SIMILARITY_THRESHOLD {
-                let tags = pantsu_tags::get_sauce_tags(sauce).await?;
-                let sauce = relevant_sauces.into_iter().next().unwrap();
-                Ok(SauceJudgement::Matching { sauce, tags })
-            }
-            else {
-                Ok(SauceJudgement::Unsure(SauceUnsure { image_handle: image.clone(), matches: relevant_sauces }))
-            }
+    let (good_sauces, unsure_sauces): (Vec<SauceMatch>, Vec<SauceMatch>) = sauces.into_iter()
+        .filter(|s| s.similarity > RELEVANT_SIMILARITY_THESHOLD)  // only keep relevant sauces
+        .partition(|s| s.similarity > FOUND_SIMILARITY_THRESHOLD);
+
+    for good_sauce in good_sauces {
+        match pantsu_tags::get_sauce_tags(&good_sauce).await {
+            Ok(tags) => return Ok(SauceJudgement::Matching { sauce: good_sauce, tags }),
+            Err(pantsu_tags::Error::HtmlParseError) => continue,    // Html error can happen if image was deleted on gelbooru, try next sauceMatch
+            Err(e) => return Err(e.into())
         }
-        None => Ok(SauceJudgement::NotExisting),
     }
+
+    if !unsure_sauces.is_empty() {
+        return Ok(SauceJudgement::Unsure(SauceUnsure { image_handle: image.clone(), matches: unsure_sauces }));
+    }
+
+    Ok(SauceJudgement::NotExisting)
 }
 
 async fn store_sauce_in_db(pdb: &mut PantsuDB, image: &ImageHandle, sauce_judgement: &SauceJudgement) -> AppResult<()> {

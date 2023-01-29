@@ -62,7 +62,7 @@ pub const NOT_CHECKED_FLAG: &str =
 
 #[derive(Debug, Eq)]
 pub struct SauceMatch {
-    pub link: String,
+    pub link: String,           // link can be invalid if image was deleted on gelbooru
     pub similarity: i32,
     pub resolution: (i32, i32),
 }

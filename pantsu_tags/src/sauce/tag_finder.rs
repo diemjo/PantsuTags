@@ -8,6 +8,7 @@ use crate::common::pantsu_tag::{PantsuTag, PantsuTagType};
 
 use super::net;
 
+// If image was deleted on gelbooru, throws an HtmlParseError
 pub async fn find_tags_gelbooru(url: &str) -> Result<Vec<PantsuTag>, Error> {
     let client = Client::new();
     let resp = client.get(url).send().await?;
