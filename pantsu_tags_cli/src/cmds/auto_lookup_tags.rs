@@ -158,8 +158,7 @@ fn resolve_sauce_thread(mut pdb: PantsuDB, mut rx: Receiver<ResolveRequest>, num
         assert!(image_idx < num_images_to_resolve);
         image_idx += 1;
         println!("\nImage {} of {}:\n{}\n", image_idx, num_images_to_resolve, common::get_path(&image_path));
-        thumb_displayer.set_thumbnails(thumbnails);
-        thumb_displayer.feh_display(&image_path);
+        thumb_displayer.feh_display(&image_path, thumbnails);
         for (index, sauce) in image.matches.iter().enumerate() {
             println!("{} - {}", index+1, sauce.link);
         }
@@ -292,23 +291,17 @@ impl ThumbnailDisplayer {
         }
     }
 
-    fn set_thumbnails(&mut self, thumbnails: pantsu_tags::Result<Vec<TmpFile>>) {
-        if !self.enabled {
-            return;
-        }
-        match thumbnails {
-            Ok(paths) => self.thumbnails = paths,
-            Err(_) => self.disable("Unable to download source thumbnails"),
-        }
-    }
-
-    fn feh_display(&mut self, image_path: &Path) {
+    fn feh_display(&mut self, image_path: &Path, thumbnails: pantsu_tags::Result<Vec<TmpFile>>) {
         if !self.enabled {
             return;
         }
         let image_path_str = match common::try_get_path(image_path) {
             Ok(path) => path,
-            Err(_) => { self.disable("Image path is invalid"); return; },
+            Err(_) => { self.print_skip("Image path is invalid"); return; },
+        };
+        match thumbnails {
+            Ok(thumbnails) => self.thumbnails = thumbnails, // take ownership to guarantee TmpFile exists as long as feh runs.
+            Err(_) => { self.print_skip("Unable to download source thumbnails"); return; },
         };
 
         let paths = self.thumbnails.iter()
@@ -316,16 +309,16 @@ impl ThumbnailDisplayer {
             .collect::<Option<Vec<&str>>>();
         let paths = match paths {
             Some(p) => p,
-            None => { self.disable("Source thumbnail path is invalid"); return; },
+            None => { self.print_skip("Source thumbnail path is invalid"); return; },
         };
         let mut procs = self.feh_processes.take().unwrap_or(FehProcesses::new_empty());
         procs = feh::feh_display_images(iter::once(image_path_str.as_str()), "Local image", procs);
         self.feh_processes = Some(feh::feh_display_images(paths.into_iter(), "Potential source", procs));
     }
 
-    fn disable(&mut self, msg: &str) {
-        self.enabled = false;
-        warn!("Disable feh: {}", msg);
+    fn print_skip(&mut self, msg: &str) {
+        println!("Not launching feh: {}", msg); 
+        warn!("Not launching feh: {}", msg);
     }
 
     fn kill_feh(&mut self) {
@@ -333,6 +326,5 @@ impl ThumbnailDisplayer {
         if let Some(procs) = procs {
             procs.kill();
         }
-
     }
 }
