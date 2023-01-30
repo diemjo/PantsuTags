@@ -11,7 +11,7 @@ use super::net;
 // If image was deleted on gelbooru, throws an HtmlParseError
 pub async fn find_tags_gelbooru(url: &str) -> Result<Vec<PantsuTag>, Error> {
     let client = Client::new();
-    let resp = client.get(url).send().await?;
+    let resp = client.get(net::gelbooru_https_url(url)?).send().await?;
     net::check_status(resp.status())?;
     let text = resp.text().await?;
     let html = Document::from(text.as_str());

@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use reqwest::{multipart::Part, StatusCode};
+use reqwest::{multipart::Part, StatusCode, Url};
 use tokio::io::AsyncReadExt;
 
 use crate::{common, Error, Result};
@@ -26,4 +26,23 @@ pub fn check_status(status: StatusCode) -> Result<()> {
         return Err(Error::BadResponseStatus(status));
     }
     Ok(())
+}
+
+pub fn https_url(url: &str) -> Result<Url> {
+    let mut https_url = Url::parse(url)
+        .or_else(|_| Err(Error::BadUrl(String::from(url))))?;
+    https_url.set_scheme("https")
+        .or_else(|_| Err(Error::BadUrl(String::from(url))))?;
+    Ok(https_url)
+}
+
+pub fn gelbooru_https_url(url: &str) -> Result<Url> {
+    let https_url = https_url(url)?;
+    let domain = https_url.domain()
+        .ok_or_else(|| Error::BadUrl(String::from(url)))?;
+
+    if !domain.ends_with("gelbooru.com") {
+        return Err(Error::BadUrl(String::from(url)))
+    }
+    Ok(https_url)
 }

@@ -1,5 +1,6 @@
 use std::path::Path;
 use futures::{stream, StreamExt};
+use log::warn;
 use reqwest::multipart::Form;
 use reqwest::Client;
 use select::document::Document;
@@ -25,7 +26,7 @@ pub async fn find_sauce(image_handle: &ImageHandle, lib_path: &Path) -> Result<V
     let image_part = net::create_image_part(image.get_path()).await?;
     let form = Form::new()
         .part("file", image_part);
-    let response = client.post(IQDB_ADDRESS)
+    let response = client.post(net::https_url(IQDB_ADDRESS)?)
         .multipart(form)
         .send().await?;
     net::check_status(response.status())?;
@@ -42,13 +43,13 @@ pub async fn get_thumbnails(sauces: &Vec<SauceMatch>) -> Result<Vec<TmpFile>> {
         .map(|sauce| {
             let client = &client;
             async move {
-                let resp = client.get(&sauce.link).send().await?;
+                let resp = client.get(net::gelbooru_https_url(&sauce.link)?).send().await?;
                 net::check_status(resp.status())?;
                 let text = resp.text().await
                     .map_err(|_| Error::FailedThumbnail)?;
                 let link = extract_thumbnail_link(&text)?;
 
-                let resp = client.get(&link).send().await?;
+                let resp = client.get(net::gelbooru_https_url(&link)?).send().await?;
                 net::check_status(resp.status())?;
                 let data = resp.bytes().await?;
                 let path = store_thumbnail(&link, data.as_ref()).await?;
@@ -150,10 +151,12 @@ fn extract_sauce_link(sauce_match_tr_element: Node) -> Option<String> {
         return None
     }
     let href = href.unwrap();
-    if href.starts_with("//") {
-        Some("https:".to_string() + href)
-    } else {
-        Some(href.to_string())
+    match net::gelbooru_https_url(href) {
+        Ok(url) => Some(url.to_string()),
+        Err(_) => {
+            warn!("Found bad url when extracting sauce link: {}", href);
+            None
+        }
     }
 }
 

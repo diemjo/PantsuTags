@@ -17,6 +17,9 @@ pub enum Error {
     #[error("Failed to get thumbnail")]
     FailedThumbnail,
 
+    #[error("Bad url: {0}")]
+    BadUrl(String),
+
     #[error("Received response with bad http status: {0}")]
     BadResponseStatus(StatusCode),
 

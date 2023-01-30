@@ -23,7 +23,7 @@ impl Drop for TmpFile {
     fn drop(&mut self) {
         assert!(self.path.starts_with(std::env::temp_dir()));
         if let Err(_) = std::fs::remove_file(&mut self.path) {
-            warn!("warning: failed to remove temporary file '{}'", common::get_path(&self.path));
+            warn!("Failed to remove temporary file '{}'", common::get_path(&self.path));
         }
     }
 }
